@@ -1,14 +1,36 @@
 import torch
+import numpy as np
+import random
 from torch.nn.modules.activation import MultiheadAttention
-
-# from classes.a2c import A2C
 from pybullet_envs.bullet.racecarGymEnv import RacecarGymEnv
 from stable_baselines.common.vec_env import SubprocVecEnv
-from stable_baselines.common import set_global_seeds
-from stable_baselines.common import policies
-from stable_baselines import A2C
+
+# from stable_baselines.common.vec_env import VecFrameStack
+
+from classes.agent import ICMAgent
+from classes.runner import Runner
+from classes.utils import get_args
 
 num_cpu = 4
+
+
+def main():
+    """Argument parsing"""
+    args = get_args()
+
+    """Environment"""
+    # create the atari environments
+    # NOTE: this wrapper automatically resets each env if the episode is done
+    env = SubprocVecEnv([make_env(render=False, rank=i) for i in range(args.num_envs)])
+
+    """Agent"""
+    agent = ICMAgent(args.n_stack, args.num_envs, env.action_space.n, lr=args.lr)
+
+    """Train"""
+    runner = Runner(agent, env, args.num_envs, args.n_stack, args.rollout_size, args.num_updates,
+                    args.max_grad_norm, args.value_coeff, args.entropy_coeff,
+                    args.tensorboard, args.log_dir, args.cuda, args.seed)
+    runner.train()
 
 
 def make_env(render, rank, seed=0):
@@ -21,21 +43,20 @@ def make_env(render, rank, seed=0):
         env = RacecarGymEnv(renders=render, isDiscrete=True)
         env.seed(seed + rank)
         return env
-    set_global_seeds(seed)
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.cuda.manual_seed(seed)
     return _init
 
 
 if __name__ == '__main__':
 
-    env = SubprocVecEnv([make_env(render=True, rank=i) for i in range(num_cpu)])
+    # main()
+    # mha = MultiheadAttention(embed_dim=2, num_heads=2)          # embed_dim % num_heads = 0
 
-    action_test = env.action_space.sample()
-    print(action_test)
-
-    mha = MultiheadAttention(embed_dim=2, num_heads=4)
-
-    model = A2C(policies.ActorCriticPolicy, env, verbose=True)
-    model.learn(total_timesteps=25000)
+    env = SubprocVecEnv([make_env(render=False, rank=i) for i in range(1)])
 
     while True:
         obs, done = env.reset(), False
@@ -44,11 +65,10 @@ if __name__ == '__main__':
         print(obs)
         episode_rew = 0
         while not done:
-            env.render(mode='human')
-            action, _states = model.predict(obs)
+            action = env.action_space.sample()
+            env.render(mode="human")
+            # action, _states = model.predict(obs)
             obs, rew, done, _ = env.step(action)
             episode_rew += rew
         print("Episode reward", episode_rew)
-
-
 
