@@ -5,7 +5,7 @@ from classes.model import A2CNet
 
 
 class ICMAgent(nn.Module):
-    def __init__(self, n_stack, num_envs, num_actions, in_size=288, feat_size=256, lr=1e-4):
+    def __init__(self, n_stack, num_envs, num_actions, in_size=512, feat_size=256, lr=1e-4):
         """
         Container class of an A2C and an ICM network, the baseline for experimenting with other curiosity-based
         methods.
@@ -13,7 +13,7 @@ class ICMAgent(nn.Module):
         :param n_stack: number of frames stacked
         :param num_envs: number of parallel environments
         :param num_actions: size of the action space of the environment
-        :param in_size: dimensionality of the input tensor
+        :param in_size: dimensionality of the input tensor      -> 288
         :param feat_size: number of the features
         :param lr: learning rate
         """

@@ -72,7 +72,7 @@ class FeatureEncoderNet(nn.Module):
         super().__init__()
         # constants
         self.in_size = in_size
-        self.h1 = 288
+        self.h1 = 512       # 288  (32 x 3 x 3)?
         self.is_lstm = is_lstm  # indicates whether the LSTM is needed
 
         # layers
@@ -114,7 +114,8 @@ class FeatureEncoderNet(nn.Module):
         :param x: input data representing the current state
         :return:
         """
-        x = self.conv(x)
+
+        x = self.conv(x)    # [1, 4, 128, 128] -> [1, 512]
 
         # return self.lin(x)
 
@@ -129,13 +130,13 @@ class FeatureEncoderNet(nn.Module):
 
 
 class A2CNet(nn.Module):
-    def __init__(self, n_stack, num_actions, in_size=288, writer=None):
+    def __init__(self, n_stack, num_actions, in_size=512, writer=None):
         """
         Implementation of the Advantage Actor-Critic (A2C) network
 
         :param n_stack: number of frames stacked
         :param num_actions: size of the action space, pass env.action_space.n
-        :param in_size: input size of the LSTMCell of the FeatureEncoderNet
+        :param in_size: input size of the LSTMCell of the FeatureEncoderNet     -> 288
         """
         super().__init__()
 

@@ -26,7 +26,7 @@ def get_args():
                         help='learning rate')
 
     # environment
-    parser.add_argument('--env-name', type=str, default='PongNoFrameskip-v4',
+    parser.add_argument('--env-name', type=str, default='racecarGymEnv',
                         help='environment name')
     parser.add_argument('--num-envs', type=int, default=1, metavar='NUM_ENVS',
                         help='number of parallel environemnts')

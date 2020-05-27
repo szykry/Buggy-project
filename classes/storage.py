@@ -93,10 +93,13 @@ class RolloutStorage(object):
         return self.states[step].clone()
 
     def obs2tensor(self, obs):
-        # 1. reorder dimensions for nn.Conv2d (batch, ch_in, width, height)
-        # 2. convert numpy array to _normalized_ FloatTensor
-        tensor = torch.from_numpy(obs.astype(np.float32).transpose((0, 3, 1, 2))) / 255.
-        return tensor.cuda() if self.is_cuda else tensor
+        # obs = tuple(1, 128, 128, 4) =>  picture(8bit): 1, height, width, channel(RGBD)
+        # tensor = [6, 1, 4, 128, 128] => [rollout+1, num_envs, stacked_frames, env_obs_frame_shape]
+        tensor = torch.tensor(obs[0])
+        tensor = tensor.permute(2, 0, 1)
+        t = torch.zeros(1, 4, 128, 128)
+        t[0] = tensor / 255.        # -> need normalization?
+        return t.cuda() if self.is_cuda else t
 
     def insert(self, step, reward, obs, action, log_prob, value, dones):
         """

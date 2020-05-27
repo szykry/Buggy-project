@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import random
 from torch.nn.modules.activation import MultiheadAttention
-from pybullet_envs.bullet.racecarGymEnv import RacecarGymEnv
+from pybullet_envs.bullet.racecarZEDGymEnv import RacecarZEDGymEnv
 from stable_baselines.common.vec_env import SubprocVecEnv
 
 # from stable_baselines.common.vec_env import VecFrameStack
@@ -21,7 +21,7 @@ def main():
     """Environment"""
     # create the atari environments
     # NOTE: this wrapper automatically resets each env if the episode is done
-    env = SubprocVecEnv([make_env(render=False, rank=i) for i in range(args.num_envs)])
+    env = SubprocVecEnv([make_env(render=True, rank=i) for i in range(args.num_envs)])
 
     """Agent"""
     agent = ICMAgent(args.n_stack, args.num_envs, env.action_space.n, lr=args.lr)
@@ -40,8 +40,9 @@ def make_env(render, rank, seed=0):
     """
 
     def _init():
-        env = RacecarGymEnv(renders=render, isDiscrete=True)
+        env = RacecarZEDGymEnv(renders=render, isDiscrete=True)
         env.seed(seed + rank)
+        env.render(mode="human")
         return env
 
     torch.manual_seed(seed)
@@ -53,22 +54,21 @@ def make_env(render, rank, seed=0):
 
 if __name__ == '__main__':
 
-    # main()
+    main()
     # mha = MultiheadAttention(embed_dim=2, num_heads=2)          # embed_dim % num_heads = 0
 
+"""
     env = SubprocVecEnv([make_env(render=False, rank=i) for i in range(1)])
 
     while True:
         obs, done = env.reset(), False
         print("===================================")
-        print("obs")
-        print(obs)
+        print("obs: ", obs)
         episode_rew = 0
         while not done:
             action = env.action_space.sample()
-            env.render(mode="human")
             # action, _states = model.predict(obs)
             obs, rew, done, _ = env.step(action)
             episode_rew += rew
         print("Episode reward", episode_rew)
-
+"""
