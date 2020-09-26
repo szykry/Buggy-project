@@ -40,6 +40,9 @@ class RacecarZEDGymEnv(gym.Env):
     self._isEnableSelfCollision = isEnableSelfCollision
     self._envStepCounter = 0
     self._renders = renders
+    self._cam_dist = 20
+    self._cam_yaw = 50
+    self._cam_pitch= -35
     self._width = 128     # 100 -> camera width
     self._height = 128    # 10 -> camera height
     self._isDiscrete = isDiscrete
@@ -53,7 +56,7 @@ class RacecarZEDGymEnv(gym.Env):
     self.reset()
 
     observationDim = len(self.getExtendedObservation())
-    #print("observationDim:", observationDim)
+
     observation_high = np.array([np.finfo(np.float32).max] * observationDim)
 
     if (isDiscrete):
@@ -75,6 +78,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._finishLineUniqueId = -1
 
   def reset(self):
+
     self._p.resetSimulation()
     #p.setPhysicsEngineParameter(numSolverIterations=300)
     self._p.setTimeStep(self._timeStep)
@@ -102,7 +106,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._finishLineUniqueId = self._p.loadURDF(os.path.join(self._urdfRoot, "r2d2.urdf"),
                                           [finishLineX, finishLineY, finishLineZ])
     if self._finishLineUniqueId < 0:
-      raise Exception("!! \n Couldnn't load finish line URDF \n !! \n ")
+      raise Exception("!! \n Could not load finish line URDF \n !! \n ")
 
     self._p.setGravity(0, 0, -10)
 
@@ -197,6 +201,7 @@ class RacecarZEDGymEnv(gym.Env):
   def render(self, mode='human', close=False):
     if mode != "rgb_array":
       return np.array([])
+
     base_pos, orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
     view_matrix = self._p.computeViewMatrixFromYawPitchRoll(cameraTargetPosition=base_pos,
                                                             distance=self._cam_dist,
@@ -232,7 +237,7 @@ class RacecarZEDGymEnv(gym.Env):
       distance = closestPoints[0][8]
       reward = -distance
 
-    print("reward:", reward)
+    # print("reward:", reward)
     return reward
 
   if parse_version(gym.__version__) < parse_version('0.9.6'):

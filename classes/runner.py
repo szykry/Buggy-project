@@ -49,7 +49,7 @@ class Runner(object):
     def train(self):
 
         """Environment reset"""
-        obs = self.env.reset()
+        obs = self.env.reset()  # this is a second reset!
         self.storage.states[0].copy_(self.storage.obs2tensor(obs))
         best_loss = np.inf
 

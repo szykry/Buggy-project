@@ -19,7 +19,6 @@ def main():
     args = get_args()
 
     """Environment"""
-    # create the atari environments
     # NOTE: this wrapper automatically resets each env if the episode is done
     env = SubprocVecEnv([make_env(render=True, rank=i) for i in range(args.num_envs)])
 
@@ -36,7 +35,7 @@ def main():
 def make_env(render, rank, seed=0):
     """
     :param rank: (int) index of the subprocess
-    :param seed: (int) the inital seed for RNG
+    :param seed: (int) the initial seed for RNG
     """
 
     def _init():
@@ -56,19 +55,3 @@ if __name__ == '__main__':
 
     main()
     # mha = MultiheadAttention(embed_dim=2, num_heads=2)          # embed_dim % num_heads = 0
-
-"""
-    env = SubprocVecEnv([make_env(render=False, rank=i) for i in range(1)])
-
-    while True:
-        obs, done = env.reset(), False
-        print("===================================")
-        print("obs: ", obs)
-        episode_rew = 0
-        while not done:
-            action = env.action_space.sample()
-            # action, _states = model.predict(obs)
-            obs, rew, done, _ = env.step(action)
-            episode_rew += rew
-        print("Episode reward", episode_rew)
-"""
