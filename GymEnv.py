@@ -16,6 +16,9 @@ import random
 import pybullet_data
 from pkg_resources import parse_version
 
+import torch
+import torch.distributions.normal as N
+
 RENDER_HEIGHT = 720
 RENDER_WIDTH = 960
 dLineColorR = 0.0
@@ -54,6 +57,7 @@ class RacecarZEDGymEnv(gym.Env):
 
     self.seed()
     self.reset()
+    self.addDebug()
 
     observationDim = len(self.getExtendedObservation())
 
@@ -95,8 +99,8 @@ class RacecarZEDGymEnv(gym.Env):
       dist = 5 + 2. * random.random()           # 5-7
       ang = 2. * 3.1415925438 * random.random() # 0-2*pi
     else:
-      dist = 7
-      ang = 2. * 3.1415925438 * 0
+      dist = 2
+      ang = 3.1415925438 * 0.5
 
     finishLineX = dist * math.sin(ang)
     finishLineY = dist * math.cos(ang)
@@ -121,6 +125,21 @@ class RacecarZEDGymEnv(gym.Env):
 
   def __del__(self):
     self._p = 0
+
+  def addDebug(self):
+    # add button
+    self.button_id = self._p.addUserDebugParameter("button", 1, 0, 1)
+    randomMap = self._p.readUserDebugParameter(self.button_id)
+
+    # add slider
+    self.slider_id = self._p.addUserDebugParameter("slider", 0.0, 1.0, 0.0)
+    dLineColorR = self._p.readUserDebugParameter(self.slider_id)
+
+    # draw the debug lines (track)
+    self._p.addUserDebugLine(lineFromXYZ=[2., random.random(), 0.],
+                             lineToXYZ=[4., 1., 1.],
+                             lineColorRGB=[dLineColorR, dLineColorG, dLineColorB],
+                             lineWidth=5.0)
 
   def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
@@ -148,12 +167,6 @@ class RacecarZEDGymEnv(gym.Env):
     up = [carmat[2], carmat[5], carmat[8]]
     viewMat = self._p.computeViewMatrix(eyePos, targetPos, up)
     #viewMat = self._p.computeViewMatrixFromYawPitchRoll(carpos,1,0,0,0,2)
-
-    # draw the debug lines (track)
-    self._p.addUserDebugLine(lineFromXYZ=[2., 0., 0.],
-                             lineToXYZ=[4., 1., 1.],
-                             lineColorRGB=[dLineColorR, dLineColorG, dLineColorB],
-                             lineWidth=5.0)
 
     projMatrix = [
         0.7499999403953552, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0000200271606445, -1.0,
@@ -227,17 +240,80 @@ class RacecarZEDGymEnv(gym.Env):
 
   def _reward(self):
     # initial reward
-    reward = -1000
+    alpha = -1000   # continuous reward: distance from the finish line
+    beta = 0        # continuous reward: positon in a lane
+    gamma = 0       # discrete reward: stopping at traffic lights
+    delta = 0       # discrete reward: avoiding static objects
+    epsilon = 0     # discrete reward: avoiding moving objects
+    # weights for the different rewards
+    w1 = 1
+    w2 = 0
+    w3 = 0
+    w4 = 0
+    w5 = 0
 
+    # alpha
     closestPoints = self._p.getClosestPoints(self._racecar.racecarUniqueId,
                                              self._finishLineUniqueId,
                                              10000)   # this is the max allowed distance
-
     if (len(closestPoints) > 0):
       distance = closestPoints[0][8]
-      reward = -distance
+      alpha = -distance
 
-    # print("reward:", reward)
+    # beta
+    if False:
+      leftLaneDist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
+                                               self._leftLaneUniqueId,
+                                               10000)  # this is the max allowed distance
+      rightLaneDist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
+                                               self._rightLaneUniqueId,
+                                               10000)  # this is the max allowed distance
+
+      if (len(leftLaneDist) > 0 and len(rightLaneDist) > 0):
+        posCar = leftLaneDist[0][8]
+        distBetweenLanes = leftLaneDist[0][8] +  rightLaneDist[0][8]
+
+        mu = distBetweenLanes/2.0
+        sig = mu/3.0                  # 3 sigma -> 99.7%
+        x = (posCar - mu)/sig         # normalize
+        m = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
+        beta = m.log_prob(x)
+
+    # gamma
+    if False:
+      tLightDist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
+                                            self._tLightUniqueId,
+                                            10000)  # this is the max allowed distance
+      velocity = self._p.getBaseVelocity(self._racecar.racecarUniqueId)
+
+      if tLight is green:
+          gamma = 0
+      else:
+        if (tLightDist[0][8] > 0.5 and tLightDist[0][8] < 2):                       # agent stops within 2 meters
+            velocity_vector = math.sqrt(velocity[0][0] ** 2 + velocity[0][1] ** 2)  # sqrt(vx^2 + vy^2)
+            gamma = -velocity_vector
+
+        elif (tLightDist[0][8] < 0.5):                          # agent is too close
+            gamma = -100                                        # huge error
+
+        else:
+            gamma = 0
+
+    # delta
+    if False:
+        for staticObjUniqueId,i in staticObjs:
+            sObjDist[i] = self._p.getClosestPoints(staticObjUniqueId,
+                                                self._tLightUniqueId,
+                                                10000)  # this is the max allowed distance
+
+        if (len(sObjDist[i]) > 0):
+            if(sObjDist[i][0][8] > 0):
+                """ TODO """
+    # epsilon
+    """ TODO """
+
+    reward = w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon
+    print("reward:", reward)
     return reward
 
   if parse_version(gym.__version__) < parse_version('0.9.6'):
