@@ -21,9 +21,7 @@ import torch.distributions.normal as N
 
 RENDER_HEIGHT = 720
 RENDER_WIDTH = 960
-dLineColorR = 0.0
-dLineColorG = 0.0
-dLineColorB = 0.0
+
 randomMap = False
 
 
@@ -128,18 +126,18 @@ class RacecarZEDGymEnv(gym.Env):
 
   def addDebug(self):
     # add button
-    self.button_id = self._p.addUserDebugParameter("button", 1, 0, 1)
-    randomMap = self._p.readUserDebugParameter(self.button_id)
+    self.button_id = self._p.addUserDebugParameter("button", 1, 0, 1)   # bug, still not working well
 
     # add slider
     self.slider_id = self._p.addUserDebugParameter("slider", 0.0, 1.0, 0.0)
-    dLineColorR = self._p.readUserDebugParameter(self.slider_id)
 
-    # draw the debug lines (track)
-    self._p.addUserDebugLine(lineFromXYZ=[2., random.random(), 0.],
-                             lineToXYZ=[4., 1., 1.],
-                             lineColorRGB=[dLineColorR, dLineColorG, dLineColorB],
-                             lineWidth=5.0)
+  def updateDebug(self):
+    """called in step function"""
+    # read button
+    randomMap = self._p.readUserDebugParameter(self.button_id)
+
+    # read slider
+    dummy = self._p.readUserDebugParameter(self.slider_id)
 
   def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
@@ -205,9 +203,12 @@ class RacecarZEDGymEnv(gym.Env):
       if self._termination():
         break
       self._envStepCounter += 1
+
     reward = self._reward()
     done = self._termination()
     #print("len=%r" % len(self._observation))
+
+    self.updateDebug()
 
     return np.array(self._observation), reward, done, {}
 
@@ -240,11 +241,11 @@ class RacecarZEDGymEnv(gym.Env):
 
   def _reward(self):
     # initial reward
-    alpha = -1000   # continuous reward: distance from the finish line
-    beta = 0        # continuous reward: positon in a lane
-    gamma = 0       # discrete reward: stopping at traffic lights
-    delta = 0       # discrete reward: avoiding static objects
-    epsilon = 0     # discrete reward: avoiding moving objects
+    alpha = -1000   # continuous reward: distance from the finish line (linear)
+    beta = 0        # continuous reward: positon in a lane (gauss)
+    gamma = 0       # discrete reward: stopping at traffic lights (linear)
+    delta = 0       # discrete reward: avoiding static objects (1/x)
+    epsilon = 0     # discrete reward: avoiding moving objects (1/x)
     # weights for the different rewards
     w1 = 1
     w2 = 0
@@ -301,16 +302,30 @@ class RacecarZEDGymEnv(gym.Env):
 
     # delta
     if False:
-        for staticObjUniqueId,i in staticObjs:
-            sObjDist[i] = self._p.getClosestPoints(staticObjUniqueId,
-                                                self._tLightUniqueId,
-                                                10000)  # this is the max allowed distance
+        nearest = 1000
 
-        if (len(sObjDist[i]) > 0):
-            if(sObjDist[i][0][8] > 0):
-                """ TODO """
+        for staticObjUniqueId,i in enumerate(staticObjs):
+            sObjDist[i] = self._p.getClosestPoints(self._racecar.racecarUniqueId,
+                                                   staticObjUniqueId,
+                                                   10000)  # this is the max allowed distance
+            sObjDist[i] = sObjDist[i][0][8]
+            if sObjDist[i] < nearest:
+                nearest = sObjDist[i]
+        if nearest < 1:
+            delta = - 1/nearest
+        else:
+            delta = 0
+
     # epsilon
-    """ TODO """
+    if False:
+        mObjDist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
+                                            movingObjUniqueId,
+                                            10000)  # this is the max allowed distance
+
+        if mObjDist < 1:
+            epsilon = - 1/mObjDist
+        else:
+            epsilon = 0
 
     reward = w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon
     print("reward:", reward)

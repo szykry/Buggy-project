@@ -20,7 +20,7 @@ def main():
 
     """Environment"""
     # NOTE: this wrapper automatically resets each env if the episode is done
-    env = SubprocVecEnv([make_env(render=True, rank=i) for i in range(args.num_envs)])
+    env = SubprocVecEnv([make_env(render=True, rank=i, rollout=args.rollout_size) for i in range(args.num_envs)])
 
     """Agent"""
     agent = ICMAgent(args.n_stack, args.num_envs, env.action_space.n, lr=args.lr)
@@ -32,14 +32,16 @@ def main():
     runner.train()
 
 
-def make_env(render, rank, seed=0):
+def make_env(render, rank, rollout=10, seed=0):
     """
+    :param render: (boolean) renders the env if True
     :param rank: (int) index of the subprocess
+    :param rollout: (int) roll-out size
     :param seed: (int) the initial seed for RNG
     """
 
     def _init():
-        env = RacecarZEDGymEnv(renders=render, isDiscrete=True)
+        env = RacecarZEDGymEnv(renders=render, isDiscrete=True, actionRepeat=rollout)
         env.seed(seed + rank)
         env.render(mode="human")
         return env
