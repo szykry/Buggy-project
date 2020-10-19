@@ -1,0 +1,136 @@
+<sdf version='1.6'>
+	<world name='default'>
+	<gravity>0 0 -9.8</gravity>
+		<model name='plane100.obj'>
+			<static>true</static>
+			<pose frame=''>0 0 0 0 0 0</pose> 			<!-- [x y z a b c] -->
+			<link name='plane'>
+			<inertial>
+				<mass>0</mass> 							<!-- it will fall if > 0 -->
+				<inertia> 								<!-- inertia calculated -->
+					<ixx>0.166667</ixx>
+					<ixy>0</ixy>
+					<ixz>0</ixz>
+					<iyy>0.166667</iyy>
+					<iyz>0</iyz>
+					<izz>0.166667</izz>
+				</inertia>
+			</inertial>
+			<collision name='collision_1'>
+				<geometry>
+		            <plane>
+		              <normal>0 0 1</normal>
+		              <size>100 100</size> 				<!-- size of field where interacts -->
+		            </plane>
+	          	</geometry>
+			</collision>
+			<visual name='visual_1'>
+				<geometry>
+					<mesh>
+						<scale>1 1 1</scale>  			<!-- size of .obj in % -->
+						<uri>plane100.obj</uri> 		<!-- root of .obj -->
+					</mesh>
+				</geometry>
+				<material> 								<!-- RGBA (0.0-1.0) -->
+					<ambient>1 1 1 1</ambient> 			<!-- color of .obj when no lights -->
+					<diffuse>1 1 1 1</diffuse> 			<!-- color of .obj under a pure white light -->
+					<specular>.1 .1 .1 1</specular> 	<!-- higher value means more shiny -->
+					<emissive>0 0 0 0</emissive> 		<!-- light emitted from the .obj -->
+				</material>
+			</visual>
+			</link>
+		</model>
+		<model name='OBJs/iron_barrier/Barrier.obj'>
+			<static>true</static>
+			<pose frame=''>0 2 0 1.5708 0 0</pose>
+			<link name='iron_barrier'>
+			<inertial>
+				<mass>0</mass>
+				<inertia>
+					<ixx>0.166667</ixx>
+					<ixy>0</ixy>
+					<ixz>0</ixz>
+					<iyy>0.166667</iyy>
+					<iyz>0</iyz>
+					<izz>0.166667</izz>
+				</inertia>
+			</inertial><!--
+			<collision name='collision_2'>
+				<geometry>
+		            <box>
+		              <size>2 .5 3</size>
+		            </box>
+	          	</geometry>
+	          	<surface>
+          			<friction>
+            			<ode>
+              				<mu>100</mu>
+              				<mu2>50</mu2>
+            			</ode>
+          			</friction>
+        		</surface>
+			</collision>-->
+			<visual name='visual_2'>
+				<geometry>
+					<mesh>
+						<scale>.1 .1 .1</scale>
+						<uri>OBJs/iron_barrier/Barrier.obj</uri>
+					</mesh>
+				</geometry>
+				<material>
+          			<script>
+            			<uri>OBJs/iron_barrier/Barrier.mtl</uri>
+            			<name>Barrier</name>
+          			</script>
+			 	</material>
+			</visual>
+			</link>
+		</model>
+		<model name='OBJs/traffic_signal/Traffic_signal.obj'>
+			<static>true</static>
+			<pose frame=''>0 -2 0 1.5708 0 0</pose>
+			<link name='traffic_signal'>
+			<inertial>
+				<mass>0</mass>
+				<inertia>
+					<ixx>0.166667</ixx>
+					<ixy>0</ixy>
+					<ixz>0</ixz>
+					<iyy>0.166667</iyy>
+					<iyz>0</iyz>
+					<izz>0.166667</izz>
+				</inertia>
+			</inertial><!--
+			<collision name='collision_3'>
+				<geometry>
+		            <box>
+		              <size>2 .5 3</size>
+		            </box>
+	          	</geometry>
+	          	<surface>
+          			<friction>
+            			<ode>
+              				<mu>100</mu>
+              				<mu2>50</mu2>
+            			</ode>
+          			</friction>
+        		</surface>
+			</collision>-->
+			<visual name='visual_3'>
+				<geometry>
+					<mesh>
+						<scale>.2 .2 .2</scale>
+						<uri>OBJs/traffic_signal/Traffic_signal.obj</uri>
+					</mesh>
+				</geometry>
+				<material>
+					<ambient>.1 .1 .1 1</ambient> 			<!-- color of .obj when no lights -->
+					<diffuse>.3 .3 .3 1</diffuse> 			<!-- color of .obj under a pure white light -->
+					<specular>.2 .2 .2 1</specular> 	<!-- higher value means more shiny -->
+					<emissive>0 0 0 0</emissive> 		<!-- light emitted from the .obj -->
+			 	</material>
+			</visual>
+			</link>
+		</model>
+	</world>
+</sdf>

@@ -44,8 +44,8 @@ class RacecarZEDGymEnv(gym.Env):
     self._cam_dist = 20
     self._cam_yaw = 50
     self._cam_pitch= -35
-    self._width = 128     # 100 -> camera width
-    self._height = 128    # 10 -> camera height
+    self._width = 128     # 640 -> camera width
+    self._height = 128    # 480 -> camera height
     self._isDiscrete = isDiscrete
 
     if self._renders:
@@ -86,19 +86,19 @@ class RacecarZEDGymEnv(gym.Env):
     self._p.setTimeStep(self._timeStep)
 
     #load the map
-    stadiumobjects = self._p.loadSDF(os.path.join(self._urdfRoot, "plane_stadium.sdf"))
+    stadiumobjects = self._p.loadSDF(os.path.join(self._urdfRoot, "buggy.sdf"))
 
-    for i in stadiumobjects:                                  #move the stadium objects slightly above 0
+    for i in stadiumobjects:
       pos, orn = self._p.getBasePositionAndOrientation(i)
-      newpos = [pos[0], pos[1], pos[2] + 0.1]
-      self._p.resetBasePositionAndOrientation(i, newpos, orn)
+      newpos = [pos[0], pos[1], pos[2] + 0.1]                   # move the stadium objects slightly above 0
+      self._p.resetBasePositionAndOrientation(i, newpos, orn)   # reset positions and orientations (center of mass)
 
     if randomMap:
       dist = 5 + 2. * random.random()           # 5-7
-      ang = 2. * 3.1415925438 * random.random() # 0-2*pi
+      ang = 2. * math.pi* random.random() # 0-2*pi
     else:
       dist = 2
-      ang = 3.1415925438 * 0.5
+      ang = math.pi * 0.5
 
     finishLineX = dist * math.sin(ang)
     finishLineY = dist * math.cos(ang)
@@ -110,7 +110,7 @@ class RacecarZEDGymEnv(gym.Env):
     if self._finishLineUniqueId < 0:
       raise Exception("!! \n Could not load finish line URDF \n !! \n ")
 
-    self._p.setGravity(0, 0, -10)
+    self._p.setGravity(0, 0, -9.8)                  # 9.8 in minus Z direction
 
     #load the racecar
     self._racecar = racecar.Racecar(self._p, urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
