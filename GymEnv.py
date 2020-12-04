@@ -11,6 +11,7 @@ import numpy as np
 import time
 import pybullet
 import pybullet_utils.bullet_client as bc
+from pybullet_utils import gazebo_world_parser
 from . import racecar
 import random
 import pybullet_data
@@ -88,6 +89,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._p.setGravity(0, 0, -9.8)                  # 9.8 in minus Z direction
 
     #load the map
+    # gazebo_world_parser.parseWorld(self._p, filepath=os.path.join(self._urdfRoot, "OBJs/gazeboworlds/racetrack_day.world"))
     mapObjects = self._p.loadSDF(os.path.join(self._urdfRoot, "buggy.sdf"))
 
     for i in mapObjects:
