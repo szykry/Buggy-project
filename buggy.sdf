@@ -16,7 +16,7 @@
 					<izz>0.166667</izz>
 				</inertia>
 			</inertial>
-			<collision name='collision_1'>
+			<collision name='collision_plane'>
 				<geometry>
 		            <plane>
 		              <normal>0 0 1</normal>
@@ -24,7 +24,7 @@
 		            </plane>
 	          	</geometry>
 			</collision>
-			<visual name='visual_1'>
+			<visual name='visual_plane'>
 				<geometry>
 					<mesh>
 						<scale>1 1 1</scale>  			<!-- size of .obj in % -->
@@ -36,13 +36,13 @@
 					<diffuse>1 1 1 1</diffuse> 			<!-- color of .obj under a pure white light -->
 					<specular>.1 .1 .1 1</specular> 	<!-- higher value means more shiny -->
 					<emissive>0 0 0 0</emissive> 		<!-- light emitted from the .obj -->
-				</material>
+				</material> 							<!-- material is not working well !!! -->
 			</visual>
 			</link>
 		</model>
 		<model name='OBJs/iron_barrier/Barrier.obj'>
 			<static>true</static>
-			<pose frame=''>0 2 0 1.5708 0 0</pose>
+			<pose frame=''>0 2 0 1.57079 0 0</pose>
 			<link name='iron_barrier'>
 			<inertial>
 				<mass>0</mass>
@@ -55,7 +55,7 @@
 					<izz>0.166667</izz>
 				</inertia>
 			</inertial><!--
-			<collision name='collision_2'>
+			<collision name='collision_iron_barrier'>
 				<geometry>
 		            <box>
 		              <size>2 .5 3</size>
@@ -70,7 +70,7 @@
           			</friction>
         		</surface>
 			</collision>-->
-			<visual name='visual_2'>
+			<visual name='visual_iron_barrier'>
 				<geometry>
 					<mesh>
 						<scale>.1 .1 .1</scale>
@@ -88,7 +88,6 @@
 		</model>
 		<model name='OBJs/traffic_signal/Traffic_signal.obj'>
 			<static>true</static>
-			<pose frame=''>0 -2 0 1.5708 0 0</pose>
 			<link name='traffic_signal'>
 			<inertial>
 				<mass>0</mass>
@@ -101,7 +100,7 @@
 					<izz>0.166667</izz>
 				</inertia>
 			</inertial><!--
-			<collision name='collision_3'>
+			<collision name='collision_traffic_light'>
 				<geometry>
 		            <box>
 		              <size>2 .5 3</size>
@@ -116,7 +115,8 @@
           			</friction>
         		</surface>
 			</collision>-->
-			<visual name='visual_3'>
+			<visual name='visual_traffic_light'>
+				<pose frame=''>0 -2 0 1.57079 0 0</pose>
 				<geometry>
 					<mesh>
 						<scale>.2 .2 .2</scale>
@@ -124,12 +124,42 @@
 					</mesh>
 				</geometry>
 				<material>
-					<ambient>.1 .1 .1 1</ambient> 			<!-- color of .obj when no lights -->
-					<diffuse>.3 .3 .3 1</diffuse> 			<!-- color of .obj under a pure white light -->
-					<specular>.2 .2 .2 1</specular> 	<!-- higher value means more shiny -->
-					<emissive>0 0 0 0</emissive> 		<!-- light emitted from the .obj -->
+					<ambient>.1 .1 .1 1</ambient>
+					<diffuse>.3 .3 .3 1</diffuse>
+					<specular>.2 .2 .2 1</specular>
+					<emissive>0 0 0 0</emissive>
 			 	</material>
 			</visual>
+			<visual name="visual_red_light">
+				<pose>0 -2 3 0 1.57079 0</pose>
+        		<geometry>
+          			<cylinder>
+            			<radius>0.1</radius>
+            			<length>0.002</length>
+          			</cylinder>
+        		</geometry>
+        		<material>
+					<ambient>1 0 0 1</ambient>
+					<diffuse>1 0 0 1</diffuse>
+					<specular>0 0 0 1</specular>
+					<emissive>1 0 0 1</emissive>
+			 	</material>
+			</visual>
+			<visual name="visual_green_light">
+        		<pose>0 -2 4 0 1.57079 0</pose>
+        		<geometry>
+          			<cylinder>
+            			<radius>0.1</radius>
+            			<length>0.002</length>
+          			</cylinder>
+        		</geometry>
+        		<material>
+					<ambient>0 1 0 1</ambient>
+					<diffuse>0 1 0 1</diffuse>
+					<specular>0 0 0 1</specular>
+					<emissive>0 1 0 1</emissive>
+			 	</material>
+      		</visual>
 			</link>
 		</model>
 	</world>

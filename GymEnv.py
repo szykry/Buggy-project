@@ -78,24 +78,26 @@ class RacecarZEDGymEnv(gym.Env):
 
     #objects:
     self._finishLineUniqueId = -1
+    self.prev_distance = 0
 
   def reset(self):
 
     self._p.resetSimulation()
     #p.setPhysicsEngineParameter(numSolverIterations=300)
     self._p.setTimeStep(self._timeStep)
+    self._p.setGravity(0, 0, -9.8)                  # 9.8 in minus Z direction
 
     #load the map
-    stadiumobjects = self._p.loadSDF(os.path.join(self._urdfRoot, "buggy.sdf"))
+    mapObjects = self._p.loadSDF(os.path.join(self._urdfRoot, "buggy.sdf"))
 
-    for i in stadiumobjects:
+    for i in mapObjects:
       pos, orn = self._p.getBasePositionAndOrientation(i)
-      newpos = [pos[0], pos[1], pos[2] + 0.1]                   # move the stadium objects slightly above 0
+      newpos = [pos[0], pos[1], pos[2] + 0.1]                   # move the map objects slightly above 0
       self._p.resetBasePositionAndOrientation(i, newpos, orn)   # reset positions and orientations (center of mass)
 
     if randomMap:
       dist = 5 + 2. * random.random()           # 5-7
-      ang = 2. * math.pi* random.random() # 0-2*pi
+      ang = 2. * math.pi* random.random()       # 0-2*pi
     else:
       dist = 2
       ang = math.pi * 0.5
@@ -110,14 +112,14 @@ class RacecarZEDGymEnv(gym.Env):
     if self._finishLineUniqueId < 0:
       raise Exception("!! \n Could not load finish line URDF \n !! \n ")
 
-    self._p.setGravity(0, 0, -9.8)                  # 9.8 in minus Z direction
-
-    #load the racecar
+    # load the racecar
     self._racecar = racecar.Racecar(self._p, urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
+
     self._envStepCounter = 0
 
     for i in range(100):
       self._p.stepSimulation()
+
     self._observation = self.getExtendedObservation()
     return np.array(self._observation)
 
@@ -194,14 +196,18 @@ class RacecarZEDGymEnv(gym.Env):
       realaction = action
 
     self._racecar.applyAction(realaction)
+
     for i in range(self._actionRepeat):
       self._p.stepSimulation()
+
       if self._renders:
         time.sleep(self._timeStep)
+
       self._observation = self.getExtendedObservation()
 
       if self._termination():
         break
+
       self._envStepCounter += 1
 
     reward = self._reward()
@@ -247,11 +253,15 @@ class RacecarZEDGymEnv(gym.Env):
     delta = 0       # discrete reward: avoiding static objects (1/x)
     epsilon = 0     # discrete reward: avoiding moving objects (1/x)
     # weights for the different rewards
+    w0 = 1
     w1 = 1
     w2 = 0
     w3 = 0
     w4 = 0
     w5 = 0
+
+    """timing should be theta -> end of the episode
+    if got there: positive reward and new finish line"""
 
     # alpha
     closestPoints = self._p.getClosestPoints(self._racecar.racecarUniqueId,
@@ -259,7 +269,9 @@ class RacecarZEDGymEnv(gym.Env):
                                              10000)   # this is the max allowed distance
     if (len(closestPoints) > 0):
       distance = closestPoints[0][8]
-      alpha = -distance
+      alpha = -(distance - self.prev_distance)      # use distance difference
+      self.prev_distance = distance
+
 
     # beta
     if False:
@@ -271,14 +283,12 @@ class RacecarZEDGymEnv(gym.Env):
                                                10000)  # this is the max allowed distance
 
       if (len(leftLaneDist) > 0 and len(rightLaneDist) > 0):
-        posCar = leftLaneDist[0][8]
-        distBetweenLanes = leftLaneDist[0][8] +  rightLaneDist[0][8]
-
+        x = leftLaneDist[0][8]
+        distBetweenLanes = leftLaneDist[0][8] +  rightLaneDist[0][8]    # hibas!
         mu = distBetweenLanes/2.0
-        sig = mu/3.0                  # 3 sigma -> 99.7%
-        x = (posCar - mu)/sig         # normalize
+        sig = mu/3.0                    # 3 sigma -> 99.7%
         m = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
-        beta = m.log_prob(x)
+        beta = m.log_prob(x)            # = ln(Normal)      ? saturation
 
     # gamma
     if False:
@@ -312,7 +322,7 @@ class RacecarZEDGymEnv(gym.Env):
             if sObjDist[i] < nearest:
                 nearest = sObjDist[i]
         if nearest < 1:
-            delta = - 1/nearest
+            delta = - math.exp(-(nearest**2))
         else:
             delta = 0
 
@@ -323,11 +333,12 @@ class RacecarZEDGymEnv(gym.Env):
                                             10000)  # this is the max allowed distance
 
         if mObjDist < 1:
-            epsilon = - 1/mObjDist
+            m = N.Normal(torch.tensor([0.0]), torch.tensor([1.0]))  # saturation - > gauss: mu-objektum -> 0
+            epsilon = 1 / m.log_prob(mObjDist[0][8])
         else:
             epsilon = 0
 
-    reward = w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon
+    reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon)
     print("reward:", reward)
     return reward
 

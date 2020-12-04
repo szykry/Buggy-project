@@ -5,8 +5,6 @@ from torch.nn.modules.activation import MultiheadAttention
 from pybullet_envs.bullet.racecarZEDGymEnv import RacecarZEDGymEnv
 from stable_baselines.common.vec_env import SubprocVecEnv
 
-# from stable_baselines.common.vec_env import VecFrameStack
-
 from classes.agent import ICMAgent
 from classes.runner import Runner
 from classes.utils import get_args
