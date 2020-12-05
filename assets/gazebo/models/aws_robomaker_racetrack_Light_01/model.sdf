@@ -21,7 +21,7 @@
       <visual name='visual'>
         <geometry>
           <mesh>
-            <uri>file://models/aws_robomaker_racetrack_Light_01/meshes/aws_Light_01_visual.obj</uri>
+            <uri>models/aws_robomaker_racetrack_Light_01/meshes/aws_Light_01_visual.obj</uri>
             <scale>0.01 0.01 0.01</scale>
           </mesh>
         </geometry>
@@ -43,7 +43,7 @@
         <pose frame=''>0 0 0 0 -0 0</pose>
         <geometry>
           <mesh>
-            <uri>file://models/aws_robomaker_racetrack_Light_01/meshes/aws_Light_01_collision.obj</uri>
+            <uri>models/aws_robomaker_racetrack_Light_01/meshes/aws_Light_01_collision.obj</uri>
             <scale>0.01 0.01 0.01</scale>
           </mesh>
         </geometry>

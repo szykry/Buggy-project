@@ -89,14 +89,15 @@ class RacecarZEDGymEnv(gym.Env):
     self._p.setGravity(0, 0, -9.8)                  # 9.8 in minus Z direction
 
     #load the map
-    # gazebo_world_parser.parseWorld(self._p, filepath=os.path.join(self._urdfRoot, "OBJs/gazeboworlds/racetrack_day.world"))
-    mapObjects = self._p.loadSDF(os.path.join(self._urdfRoot, "buggy.sdf"))
+    mapObjects = gazebo_world_parser.parseWorld(self._p, filepath=os.path.join(self._urdfRoot, "OBJs/gazebo/worlds/racetrack_day.world"))
 
+    """
+    mapObjects = self._p.loadSDF(os.path.join(self._urdfRoot, "buggy.sdf"))
     for i in mapObjects:
       pos, orn = self._p.getBasePositionAndOrientation(i)
       newpos = [pos[0], pos[1], pos[2] + 0.1]                   # move the map objects slightly above 0
       self._p.resetBasePositionAndOrientation(i, newpos, orn)   # reset positions and orientations (center of mass)
-
+    """
     if randomMap:
       dist = 5 + 2. * random.random()           # 5-7
       ang = 2. * math.pi* random.random()       # 0-2*pi
