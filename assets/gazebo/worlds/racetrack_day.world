@@ -53,6 +53,30 @@
       <pose frame="">-9.379170 -1.123267 0 0 -0 0</pose> 
     </model>  
     -->
+    <model name="aws_robomaker_racetrack_Track_05"> 
+      <include> 
+        <uri>model://aws_robomaker_racetrack_Track_05</uri> 
+      </include>  
+      <pose frame="">0 0 0.051 0 -0 0</pose> 
+    </model>  
+    <model name="aws_robomaker_racetrack_Trackline_01"> 
+      <include> 
+        <uri>model://aws_robomaker_racetrack_Trackline_01</uri> 
+      </include>  
+      <pose frame="">-4.24539 0 0.102 0 -0 0</pose> 
+    </model>  
+    <model name="aws_robomaker_racetrack_Ground_01"> 
+      <include> 
+        <uri>model://aws_robomaker_racetrack_Ground_01</uri> 
+      </include>  
+      <pose frame="">-4.9 -2 0.05 0 -0 0</pose> 
+    </model>  
+    <model name="aws_robomaker_racetrack_StopSign_01"> 
+      <include> 
+        <uri>model://aws_robomaker_racetrack_StopSign_01</uri> 
+      </include> 
+    <pose frame=''>-2.7487 -12.1054 0.000775 0.075944 0.005053 -1.56731</pose>
+    </model>  
     <model name="aws_robomaker_racetrack_Billboard_01"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_Billboard_01</uri> 
@@ -701,30 +725,6 @@
       </include>  
         <pose frame=''>-25.8909 -16.4126 0.054 0 -0.0 -0.32217</pose>
     </model>
-    <model name="aws_robomaker_racetrack_StopSign_01_00"> 
-      <include> 
-        <uri>model://aws_robomaker_racetrack_StopSign_01</uri> 
-      </include> 
-	  <pose frame=''>-2.7487 -12.1054 0.000775 0.075944 0.005053 -1.56731</pose>
-    </model>  
-    <model name="aws_robomaker_racetrack_Track_05_00"> 
-      <include> 
-        <uri>model://aws_robomaker_racetrack_Track_05</uri> 
-      </include>  
-      <pose frame="">0 0 0.051 0 -0 0</pose> 
-    </model>  
-    <model name="aws_robomaker_racetrack_Trackline_01_00"> 
-      <include> 
-        <uri>model://aws_robomaker_racetrack_Trackline_01</uri> 
-      </include>  
-      <pose frame="">-4.24539 0 0.102 0 -0 0</pose> 
-    </model>  
-    <model name="aws_robomaker_racetrack_Ground_01_00"> 
-      <include> 
-        <uri>model://aws_robomaker_racetrack_Ground_01</uri> 
-      </include>  
-      <pose frame="">-4.9 -2 0.05 0 -0 0</pose> 
-    </model>  
     <model name="aws_robomaker_racetrack_Light_01_00"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_Light_01</uri> 

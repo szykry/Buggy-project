@@ -23,7 +23,7 @@ import torch.distributions.normal as N
 RENDER_HEIGHT = 720
 RENDER_WIDTH = 960
 
-randomMap = False
+randomMap = True
 
 
 class RacecarZEDGymEnv(gym.Env):
@@ -44,7 +44,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._renders = renders
     self._cam_dist = 20
     self._cam_yaw = 50
-    self._cam_pitch= -35
+    self._cam_pitch = -35
     self._width = 128     # 640 -> camera width
     self._height = 128    # 480 -> camera height
     self._isDiscrete = isDiscrete
@@ -91,39 +91,39 @@ class RacecarZEDGymEnv(gym.Env):
     #load the map
     mapObjects = gazebo_world_parser.parseWorld(self._p, filepath=os.path.join(self._urdfRoot, "OBJs/gazebo/worlds/racetrack_day.world"))
 
-    """
+    # set finish line
+    self._finishLineUniqueId = 5    # aws_robomaker_racetrack_Billboard_01
+
+    '''
     mapObjects = self._p.loadSDF(os.path.join(self._urdfRoot, "buggy.sdf"))
     for i in mapObjects:
       pos, orn = self._p.getBasePositionAndOrientation(i)
       newpos = [pos[0], pos[1], pos[2] + 0.1]                   # move the map objects slightly above 0
       self._p.resetBasePositionAndOrientation(i, newpos, orn)   # reset positions and orientations (center of mass)
-    """
-    if randomMap:
-      dist = 5 + 2. * random.random()           # 5-7
-      ang = 2. * math.pi* random.random()       # 0-2*pi
-    else:
-      dist = 2
-      ang = math.pi * 0.5
-
-    finishLineX = dist * math.sin(ang)
-    finishLineY = dist * math.cos(ang)
-    finishLineZ = 1
-
-    # load the objects
-    self._finishLineUniqueId = self._p.loadURDF(os.path.join(self._urdfRoot, "r2d2.urdf"),
-                                          [finishLineX, finishLineY, finishLineZ])
-    if self._finishLineUniqueId < 0:
-      raise Exception("!! \n Could not load finish line URDF \n !! \n ")
+    
+    print(self._p.loadURDF(os.path.join(self._urdfRoot, "r2d2.urdf"), [finishLineX, finishLineY, finishLineZ]))
+    '''
 
     # load the racecar
     self._racecar = racecar.Racecar(self._p, urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
+    pos, orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
+
+    if randomMap:
+        newX = -10 + 4. * random.random()
+        newY = -15.5
+    else:
+        newX = -10
+        newY = -15.5
+
+    newZ = pos[2]
+    self._p.resetBasePositionAndOrientation(self._racecar.racecarUniqueId, [newX, newY, newZ], orn)
 
     self._envStepCounter = 0
-
     for i in range(100):
       self._p.stepSimulation()
 
     self._observation = self.getExtendedObservation()
+
     return np.array(self._observation)
 
   def __del__(self):
@@ -270,6 +270,7 @@ class RacecarZEDGymEnv(gym.Env):
     closestPoints = self._p.getClosestPoints(self._racecar.racecarUniqueId,
                                              self._finishLineUniqueId,
                                              10000)   # this is the max allowed distance
+    # maybe this should be changed to manual calculation
     if (len(closestPoints) > 0):
       distance = closestPoints[0][8]
       alpha = -(distance - self.prev_distance)      # use distance difference

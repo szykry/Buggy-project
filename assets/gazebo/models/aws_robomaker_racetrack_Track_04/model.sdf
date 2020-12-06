@@ -21,7 +21,7 @@
       <visual name='visual'>
         <geometry>
           <mesh>
-            <uri>file://models/aws_robomaker_racetrack_Track_04/meshes/aws_Track_04_visual.DAE</uri>
+            <uri>models/aws_robomaker_racetrack_Track_04/meshes/aws_Track_04_visual.DAE</uri>
           </mesh>
         </geometry>
         <material>
@@ -42,7 +42,7 @@
         <pose frame=''>0 0 0 0 -0 0</pose>
         <geometry>
           <mesh>
-            <uri>file://models/aws_robomaker_racetrack_Track_04/meshes/aws_Track_04_collision.DAE</uri>
+            <uri>models/aws_robomaker_racetrack_Track_04/meshes/aws_Track_04_collision.DAE</uri>
             <scale>1 1 1</scale>
           </mesh>
         </geometry>
