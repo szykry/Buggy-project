@@ -36,24 +36,31 @@ class RacecarZEDGymEnv(gym.Env):
                isDiscrete=False,
                renders=True):
     print("init")
-    self._timeStep = 0.01
     self._urdfRoot = urdfRoot
     self._actionRepeat = actionRepeat
     self._isEnableSelfCollision = isEnableSelfCollision
-    self._envStepCounter = 0
+    self._isDiscrete = isDiscrete
     self._renders = renders
+    self._timeStep = 0.01
+    self._envStepCounter = 0
     self._cam_dist = 20
     self._cam_yaw = 50
     self._cam_pitch = -35
     self._width = 128     # 640 -> camera width
     self._height = 128    # 480 -> camera height
-    self._isDiscrete = isDiscrete
+    self.prev_distance = 0
 
     if self._renders:
       self._p = bc.BulletClient(connection_mode=pybullet.GUI)
     else:
       self._p = bc.BulletClient()
 
+    # objects
+    self._finishLineUniqueId = None
+    self._mapObjects = None
+    self._staticObjects = {}
+
+    # reset
     self.seed()
     self.reset()
     self.addDebug()
@@ -77,9 +84,6 @@ class RacecarZEDGymEnv(gym.Env):
 
     self.viewer = None
 
-    #objects:
-    self._finishLineUniqueId = -1
-    self.prev_distance = 0
 
   def reset(self):
 
@@ -88,11 +92,16 @@ class RacecarZEDGymEnv(gym.Env):
     self._p.setTimeStep(self._timeStep)
     self._p.setGravity(0, 0, -9.8)                  # 9.8 in minus Z direction
 
-    #load the map
-    mapObjects = gazebo_world_parser.parseWorld(self._p, filepath=os.path.join(self._urdfRoot, "OBJs/gazebo/worlds/racetrack_day.world"))
+    # load the map
+    self._mapObjects = gazebo_world_parser.parseWorld(self._p, filepath=os.path.join(self._urdfRoot, "OBJs/gazebo/worlds/racetrack_day.world"))
 
     # set finish line
-    self._finishLineUniqueId = 5    # aws_robomaker_racetrack_Billboard_01
+    self._finishLineUniqueId = 5     # aws_robomaker_racetrack_Billboard_01 (hard coded)
+
+    # select static objects
+    for k, v in self._mapObjects.items():  # nested dict
+        if k[-1] == "S":
+            self._staticObjects.update({k: v})
 
     '''
     mapObjects = self._p.loadSDF(os.path.join(self._urdfRoot, "buggy.sdf"))
@@ -248,6 +257,12 @@ class RacecarZEDGymEnv(gym.Env):
   def _termination(self):
     return self._envStepCounter > 1000
 
+  def _distance2(self, posA, posB):
+      return math.sqrt((posA[0]-posB[0])**2 + (posA[1]-posB[1])**2)
+
+  def _distance3(self, posA, posB):
+      return math.sqrt((posA[0]-posB[0])**2 + (posA[1]-posB[1])**2 + (posA[2]-posB[2])**2)
+
   def _reward(self):
     # initial reward
     alpha = -1000   # continuous reward: distance from the finish line (linear)
@@ -255,27 +270,26 @@ class RacecarZEDGymEnv(gym.Env):
     gamma = 0       # discrete reward: stopping at traffic lights (linear)
     delta = 0       # discrete reward: avoiding static objects (1/x)
     epsilon = 0     # discrete reward: avoiding moving objects (1/x)
-    # weights for the different rewards
+
+    # weights for the different rewards, these should be tuned via sliders
     w0 = 1
     w1 = 1
     w2 = 0
-    w3 = 0
-    w4 = 0
+    w3 = 1
+    w4 = 1
     w5 = 0
 
     """timing should be theta -> end of the episode
     if got there: positive reward and new finish line"""
 
-    # alpha
-    closestPoints = self._p.getClosestPoints(self._racecar.racecarUniqueId,
-                                             self._finishLineUniqueId,
-                                             10000)   # this is the max allowed distance
-    # maybe this should be changed to manual calculation
-    if (len(closestPoints) > 0):
-      distance = closestPoints[0][8]
-      alpha = -(distance - self.prev_distance)      # use distance difference
-      self.prev_distance = distance
+    # get positions
+    car_pos, car_orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
+    finish_pos, finish_orn = self._p.getBasePositionAndOrientation(self._finishLineUniqueId)
 
+    # alpha
+    car_fin_dist = self._distance3(car_pos, finish_pos)
+    alpha = -(car_fin_dist - self.prev_distance)      # use distance difference
+    self.prev_distance = car_fin_dist
 
     # beta
     if False:
@@ -295,43 +309,42 @@ class RacecarZEDGymEnv(gym.Env):
         beta = m.log_prob(x)            # = ln(Normal)      ? saturation
 
     # gamma
-    if False:
-      tLightDist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
-                                            self._tLightUniqueId,
-                                            10000)  # this is the max allowed distance
-      velocity = self._p.getBaseVelocity(self._racecar.racecarUniqueId)
+    tLight_pos = self._mapObjects["aws_robomaker_racetrack_RaceStartLight_01_00"]["pose_xyz"]
+    car_light_dist = self._distance2(car_pos, tLight_pos)
+    velocity = self._p.getBaseVelocity(self._racecar.racecarUniqueId)
 
-      if tLight is green:
-          gamma = 0
-      else:
-        if (tLightDist[0][8] > 0.5 and tLightDist[0][8] < 2):                       # agent stops within 2 meters
+    if False:       # tLight is green -> state machine
+      gamma = 0
+    else:
+        if (car_light_dist > 0.5 and car_light_dist < 2):                       # agent stops within 2 meters
             velocity_vector = math.sqrt(velocity[0][0] ** 2 + velocity[0][1] ** 2)  # sqrt(vx^2 + vy^2)
             gamma = -velocity_vector
 
-        elif (tLightDist[0][8] < 0.5):                          # agent is too close
+        elif (car_light_dist < 0.5):                          # agent is too close
             gamma = -100                                        # huge error
 
         else:
             gamma = 0
 
     # delta
-    if False:
-        nearest = 1000
+    nearest = 1000
+    sObj_pos = []
 
-        for staticObjUniqueId,i in enumerate(staticObjs):
-            sObjDist[i] = self._p.getClosestPoints(self._racecar.racecarUniqueId,
-                                                   staticObjUniqueId,
-                                                   10000)  # this is the max allowed distance
-            sObjDist[i] = sObjDist[i][0][8]
-            if sObjDist[i] < nearest:
-                nearest = sObjDist[i]
-        if nearest < 1:
-            delta = - math.exp(-(nearest**2))
-        else:
-            delta = 0
+    for i, k in enumerate(self._staticObjects.keys()):
+        sObj_pos.append(self._staticObjects[k]["pose_xyz"])
+        car_sObj_dist = self._distance3(car_pos, sObj_pos[i])
+
+        if car_sObj_dist < nearest:
+            nearest = car_sObj_dist
+
+    if nearest < 1:
+        delta = - math.exp(-(nearest**2))
+    else:
+        delta = 0
 
     # epsilon
     if False:
+        # moving objects are other urdfs -> this function can be used
         mObjDist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
                                             movingObjUniqueId,
                                             10000)  # this is the max allowed distance

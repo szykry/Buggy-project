@@ -35,14 +35,6 @@
         <uri>model://aws_robomaker_racetrack_Fence_02</uri> 
       </include>  
         <pose frame=''>-1.05264 -0.5238 0.040535 -0.008781 0.086261 -1.77545</pose>
-    </model> 
-    
-    this should be used as static object
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_10"> 
-      <include> 
-        <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
-      </include>  
-        <pose frame=''>22.2917 13.5697 0 0 -0 0</pose>
     </model>  
 
     this should be used as static object
@@ -75,7 +67,7 @@
       <include> 
         <uri>model://aws_robomaker_racetrack_StopSign_01</uri> 
       </include> 
-    <pose frame=''>-2.7487 -12.1054 0.000775 0.075944 0.005053 -1.56731</pose>
+    <pose frame=''>-2.7487 -16.5 0.000775 0.075944 0.005053 -1.56731</pose>
     </model>  
     <model name="aws_robomaker_racetrack_Billboard_01"> 
       <include> 
@@ -83,121 +75,121 @@
       </include>  
       <pose frame="">4.32789 -14.8431 -2e-06 0 1e-06 1.56416</pose> 
     </model>
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_10"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_00"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>22.2917 13.5697 0 0 -0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_11"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_01"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>22.9018 12.8693 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_12"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_02"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>22.2128 6.62693 0.054 0 0 0</pose>
     </model>
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_15"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_03"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>20.8422 -8.59507 0.054 0 0 0.012499</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_16"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_04"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>20.3649 -9.17417 0 0 -0 0.004768</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_17"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_05"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>19.7995 -9.67862 0.054 0 0 -0.003254</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_18"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_06"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>19.1471 -10.2467 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_19"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_07"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include> 
         <pose frame=''>18.3999 -10.9106 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_22"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_08"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>14.1427 -12.6734 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_23"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_09"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>14.9254 -12.4456 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_25"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_10"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>13.3868 -12.8508 0.054 0 0 0</pose>
     </model>   
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_29"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_11"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>23.6827 12.1956 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_30"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_12"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>24.3346 11.4874 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_31"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_13"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include> 
         <pose frame=''>24.8882 10.6788 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_32"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_14"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>20.5304 9.13561 0.054 0 0 -0.001449</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_33"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_15"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>19.3714 10.0864 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_34"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_16"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>20.0016 9.69426 0 0 0 -0.00182</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_35"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_17"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>21.0478 8.57525 0.054 0 0 -0.000349</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_36"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_18"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
         <pose frame=''>21.5218 7.97169 0.054 0 0 0</pose>
     </model>  
-    <model name="aws_robomaker_racetrack_CrashworthBucket_01_37"> 
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_19"> 
       <include> 
         <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
       </include>  
@@ -988,7 +980,7 @@
         <uri>model://aws_robomaker_racetrack_Wall_01</uri> 
       </include>  
       <pose frame="">30.8212 17.8155 0 0 -0 1.57459</pose> 
-    </model>  
+    </model>   
     <model name="ground_plane"> 
       <pose frame="">0 0 -1 0 -0 0</pose>  
       <scale>1 1 1</scale>  
@@ -998,7 +990,21 @@
         <acceleration>0 0 0 0 -0 0</acceleration>  
         <!-- <wrench>0 0 0 0 -0 0</wrench>  -->
       </link> 
-    </model>  
+    </model> 
+    <!--                  STATIC OBJECTS                        -->
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_0_S"> 
+      <include> 
+        <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
+      </include>  
+        <pose frame=''>-9 -14.5 0 0 -0 0</pose>
+    </model>
+    <model name="aws_robomaker_racetrack_CrashworthBucket_01_1_S"> 
+      <include> 
+        <uri>model://aws_robomaker_racetrack_CrashworthBucket_01</uri> 
+      </include>  
+        <pose frame=''>-5 -15.5 0 0 -0 0</pose>
+    </model> 
+    <!--                  END OF MODELS                         -->
     <state world_name="default"> 
       <sim_time>7212 321000000</sim_time>  
       <real_time>744 496821786</real_time>  
