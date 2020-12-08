@@ -41,14 +41,17 @@ class RacecarZEDGymEnv(gym.Env):
     self._isEnableSelfCollision = isEnableSelfCollision
     self._isDiscrete = isDiscrete
     self._renders = renders
-    self._timeStep = 0.01
+    self._timeStep = 0.01   # default is 240 Hz
     self._envStepCounter = 0
+    self._prev_envStepCounter = 0
+    self._terminationNum = 1000 # max number of actions before reset
     self._cam_dist = 20
     self._cam_yaw = 50
     self._cam_pitch = -35
     self._width = 128     # 640 -> camera width
     self._height = 128    # 480 -> camera height
-    self.prev_distance = 0
+    self._prev_distance = 0
+    self._prevState = "red"
 
     if self._renders:
       self._p = bc.BulletClient(connection_mode=pybullet.GUI)
@@ -126,6 +129,7 @@ class RacecarZEDGymEnv(gym.Env):
 
     newZ = pos[2]
     self._p.resetBasePositionAndOrientation(self._racecar.racecarUniqueId, [newX, newY, newZ], orn)
+    self._p.resetDebugVisualizerCamera(1, -90, -40, [newX, newY, newZ])
 
     self._envStepCounter = 0
     for i in range(100):
@@ -181,9 +185,10 @@ class RacecarZEDGymEnv(gym.Env):
     #viewMat = self._p.computeViewMatrixFromYawPitchRoll(carpos,1,0,0,0,2)
 
     projMatrix = [
-        0.7499999403953552, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0000200271606445, -1.0,
-        0.0, 0.0, -0.02000020071864128, 0.0
-    ]
+        0.7499999403953552, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, -1.0000200271606445, -1.0,
+        0.0, 0.0, -0.02000020071864128, 0.0]
     img_arr = self._p.getCameraImage(width=self._width,
                                      height=self._height,
                                      viewMatrix=viewMat,
@@ -196,7 +201,7 @@ class RacecarZEDGymEnv(gym.Env):
   def step(self, action):
     if (self._renders):
       basePos, orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
-      #self._p.resetDebugVisualizerCamera(1, 30, -40, basePos)
+      # self._p.resetDebugVisualizerCamera(1, 30, -40, basePos)     # a button for this
 
     if (self._isDiscrete):
       fwd = [-1, -1, -1, 0, 0, 0, 1, 1, 1]
@@ -223,7 +228,7 @@ class RacecarZEDGymEnv(gym.Env):
       self._envStepCounter += 1
 
     reward = self._reward()
-    done = self._termination()
+    done = self._termination()  # resets the environment
     #print("len=%r" % len(self._observation))
 
     self.updateDebug()
@@ -255,13 +260,42 @@ class RacecarZEDGymEnv(gym.Env):
     return rgb_array
 
   def _termination(self):
-    return self._envStepCounter > 1000
+    return self._envStepCounter > self._terminationNum
 
-  def _distance2(self, posA, posB):
+  def _distance2D(self, posA, posB):
       return math.sqrt((posA[0]-posB[0])**2 + (posA[1]-posB[1])**2)
 
-  def _distance3(self, posA, posB):
+  def _distance3D(self, posA, posB):
       return math.sqrt((posA[0]-posB[0])**2 + (posA[1]-posB[1])**2 + (posA[2]-posB[2])**2)
+
+  def _distanceFromTrafficLine(self, car_pos, center, length, width, radius):
+      UpperX = center[0] + length/2
+      BottomX = center[0] - length/2
+      if car_pos[0] < UpperX and car_pos[0] > BottomX:  # the car is in one of the straight lines
+          distance = abs(car_pos[1]) - width
+      else:                                             # the car is in one of the corners
+          if car_pos[0] >= UpperX:                      # deciding which corner
+              r = self._distance2D(car_pos, [UpperX, 0])
+          else:
+              r = self._distance2D(car_pos, [BottomX, 0])
+          distance = r - radius
+
+      return distance
+
+  def _trafficLightStateMachine(self):
+      state = self._prevState
+
+      if ((self._envStepCounter - self._prev_envStepCounter) >= 200) and self._prevState == "green":
+          state = "red"
+          self._prev_envStepCounter = self._envStepCounter
+          self._prevState = state
+
+      if ((self._envStepCounter - self._prev_envStepCounter) >= 50) and self._prevState == "red":
+          state = "green"
+          self._prev_envStepCounter = self._envStepCounter
+          self._prevState = state
+
+      return state
 
   def _reward(self):
     # initial reward
@@ -274,46 +308,44 @@ class RacecarZEDGymEnv(gym.Env):
     # weights for the different rewards, these should be tuned via sliders
     w0 = 1
     w1 = 1
-    w2 = 0
+    w2 = 1
     w3 = 1
     w4 = 1
     w5 = 0
 
-    """timing should be theta -> end of the episode
+    """timing should be tau -> end of the episode
     if got there: positive reward and new finish line"""
 
-    # get positions
+    # get car positions
     car_pos, car_orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
-    finish_pos, finish_orn = self._p.getBasePositionAndOrientation(self._finishLineUniqueId)
+
 
     # alpha
-    car_fin_dist = self._distance3(car_pos, finish_pos)
-    alpha = -(car_fin_dist - self.prev_distance)      # use distance difference
-    self.prev_distance = car_fin_dist
+    finish_pos, finish_orn = self._p.getBasePositionAndOrientation(self._finishLineUniqueId)
+    car_fin_dist = self._distance3D(car_pos, finish_pos)
+    alpha = -(car_fin_dist - self._prev_distance)      # distance difference
+    self._prev_distance = car_fin_dist
 
     # beta
-    if False:
-      leftLaneDist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
-                                               self._leftLaneUniqueId,
-                                               10000)  # this is the max allowed distance
-      rightLaneDist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
-                                               self._rightLaneUniqueId,
-                                               10000)  # this is the max allowed distance
-
-      if (len(leftLaneDist) > 0 and len(rightLaneDist) > 0):
-        x = leftLaneDist[0][8]
-        distBetweenLanes = leftLaneDist[0][8] +  rightLaneDist[0][8]    # hibas!
-        mu = distBetweenLanes/2.0
-        sig = mu/3.0                    # 3 sigma -> 99.7%
-        m = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
-        beta = m.log_prob(x)            # = ln(Normal)      ? saturation
+    center = self._mapObjects["aws_robomaker_racetrack_Trackline_01"]["pose_xyz"]
+    x = self._distanceFromTrafficLine(car_pos=car_pos,
+                                      center=center,
+                                      length=32,
+                                      width=15,         # width should be the same as radius
+                                      radius=14.75)     # traffic line is the zero point
+    distBetweenLanes = 1.2          # hard coded
+    mu = distBetweenLanes/2.0       # maybe shift left?
+    sig = mu/3.0                    # 3 sigma -> 99.7%
+    m = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
+    beta = m.log_prob(x).item()     # = ln(Normal)-> returns tensor      ? saturation
 
     # gamma
     tLight_pos = self._mapObjects["aws_robomaker_racetrack_RaceStartLight_01_00"]["pose_xyz"]
-    car_light_dist = self._distance2(car_pos, tLight_pos)
+    car_light_dist = self._distance2D(car_pos, tLight_pos)
     velocity = self._p.getBaseVelocity(self._racecar.racecarUniqueId)
+    tLight = self._trafficLightStateMachine()
 
-    if False:       # tLight is green -> state machine
+    if tLight == "green":
       gamma = 0
     else:
         if (car_light_dist > 0.5 and car_light_dist < 2):                       # agent stops within 2 meters
@@ -332,7 +364,7 @@ class RacecarZEDGymEnv(gym.Env):
 
     for i, k in enumerate(self._staticObjects.keys()):
         sObj_pos.append(self._staticObjects[k]["pose_xyz"])
-        car_sObj_dist = self._distance3(car_pos, sObj_pos[i])
+        car_sObj_dist = self._distance3D(car_pos, sObj_pos[i])
 
         if car_sObj_dist < nearest:
             nearest = car_sObj_dist
