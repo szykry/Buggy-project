@@ -41,7 +41,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._isEnableSelfCollision = isEnableSelfCollision
     self._isDiscrete = isDiscrete
     self._renders = renders
-    self._timeStep = 0.01   # default is 240 Hz
+    self._timeStep = 0.02   # default is 240 Hz
     self._envStepCounter = 0
     self._prev_envStepCounter = 0
     self._terminationNum = 1000 # max number of actions before reset
@@ -52,9 +52,9 @@ class RacecarZEDGymEnv(gym.Env):
     self._height = 128    # 480 -> camera height
     self._prev_distance = 0
     self._prevState = "red"
-    self._direction = 1     # direction of moving object
-    self._mObjposA = [-2, -2, 0]
-    self._mObjposB = [0, 0, 0]
+    self._direction = 1                 # direction of moving object
+    self._mObjposA = [4, -14.1, 0.9]    # moving object strolls between these positions
+    self._mObjposB = [4, -15.8, 0.9]
 
     if self._renders:
       self._p = bc.BulletClient(connection_mode=pybullet.GUI)
@@ -115,11 +115,9 @@ class RacecarZEDGymEnv(gym.Env):
       pos, orn = self._p.getBasePositionAndOrientation(i)
       newpos = [pos[0], pos[1], pos[2] + 0.1]                   # move the map objects slightly above 0
       self._p.resetBasePositionAndOrientation(i, newpos, orn)   # reset positions and orientations (center of mass)
-    
-    print(self._p.loadURDF(os.path.join(self._urdfRoot, "r2d2.urdf"), [finishLineX, finishLineY, finishLineZ]))
     '''
     # load moving objects
-    self._movingObjectUniqueId = self._p.loadURDF(os.path.join(self._urdfRoot, "r2d2.urdf"), [0, 0, 1])
+    self._movingObjectUniqueId = self._p.loadURDF(os.path.join(self._urdfRoot, "r2d2.urdf"), self._mObjposA)
 
     # load the racecar
     self._racecar = racecar.Racecar(self._p, urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
@@ -134,7 +132,7 @@ class RacecarZEDGymEnv(gym.Env):
 
     newZ = pos[2]
     self._p.resetBasePositionAndOrientation(self._racecar.racecarUniqueId, [newX, newY, newZ], orn)
-    self._p.resetDebugVisualizerCamera(1, -90, -40, [newX, newY, newZ])
+    self._p.resetDebugVisualizerCamera(2, -90, -40, [newX, newY, newZ])     # set camera above car
 
     self._envStepCounter = 0
     for i in range(100):
@@ -271,11 +269,11 @@ class RacecarZEDGymEnv(gym.Env):
 
   def _strollingObject(self):
       if self._direction > 0:
-          arrived = self._movingObject(self._movingObjectUniqueId, self._mObjposA, 0.1)
+          arrived = self._movingObject(self._movingObjectUniqueId, self._mObjposB, 0.1)
           if arrived:
               self._direction = -1
       else:
-          arrived = self._movingObject(self._movingObjectUniqueId, self._mObjposB, 0.1)
+          arrived = self._movingObject(self._movingObjectUniqueId, self._mObjposA, 0.1)
           if arrived:
               self._direction = 1
 
@@ -283,15 +281,10 @@ class RacecarZEDGymEnv(gym.Env):
 
   def _movingObject(self, objId, toPos, eps):
       obj_pos, _ = self._p.getBasePositionAndOrientation(objId)
-
-      force = 300 * (np.array(toPos) - np.array(obj_pos))   # log(x) ?
-      self._p.applyExternalForce(objectUniqueId=objId,
-                                 linkIndex=-1,
-                                 forceObj=force,
-                                 posObj=obj_pos,
-                                 flags=self._p.WORLD_FRAME)
-
       d = self._distance2D(obj_pos, toPos)  # only 2D
+
+      self._p.resetBaseVelocity(objId, [0, -5*self._direction, 0])      # should be tunable
+
       if d < eps:   # object arrived
           return True
       else:
@@ -367,9 +360,9 @@ class RacecarZEDGymEnv(gym.Env):
                                       length=32,
                                       width=15,         # width should be the same as radius
                                       radius=14.75)     # traffic line is the zero point
-    distBetweenLanes = 1.2          # hard coded
-    mu = distBetweenLanes/2.0       # maybe shift left?
-    sig = mu/3.0                    # 3 sigma -> 99.7%
+    distBetweenLanes = 1.2                # hard coded
+    mu = distBetweenLanes/2.0     # shifted to the middle of the track
+    sig = mu/3.0                        # 3 sigma -> 99.7%
     m = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
     beta = m.log_prob(x).item()     # = ln(Normal)-> returns tensor      ? saturation
 

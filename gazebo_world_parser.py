@@ -126,9 +126,10 @@ def parse_text(text):
     return parse_number(text)
 
 
-def parseModel(model_xml, urdffilepath):
-    print("--------------------")
-    print("parsing model")
+def parseModel(model_xml, urdffilepath, verbose=False):
+    if verbose:
+        print("--------------------")
+        print("parsing model")
     newmodel = {a: model_xml.attrib[a] for a in model_xml.attrib}
     newmodel['children'] = []
     include_xml = model_xml.find('include')
@@ -140,7 +141,8 @@ def parseModel(model_xml, urdffilepath):
             prefix = "model://"
             if uri.startswith(prefix):
                 uri = "C:/Users/Kry/Anaconda3/lib/site-packages/pybullet_data/OBJs/gazebo/models/" + uri[len(prefix):] + "/model.sdf"
-            print("uri=", uri)
+            if verbose:
+                print("uri=", uri)
             newmodel['uri'] = uri
 
     pose_xml = model_xml.find('pose')
@@ -149,13 +151,14 @@ def parseModel(model_xml, urdffilepath):
     if pose and len(pose) == 6:
         newmodel['pose_xyz'] = pose[:3]
         newmodel['pose_rpy'] = pose[3:]
-        print("newmodel['pose_xyz']=", newmodel['pose_xyz'])
-        print("newmodel['pose_rpy']=", newmodel['pose_rpy'])
+        if verbose:
+            print("newmodel['pose_xyz']=", newmodel['pose_xyz'])
+            print("newmodel['pose_rpy']=", newmodel['pose_rpy'])
 
     return newmodel
 
 
-def parseWorld(p, filepath):
+def parseWorld(p, filepath, verbose=False):
     # load element tree from file
     tree = ET.parse(filepath)
     root = tree.getroot()
@@ -163,9 +166,11 @@ def parseWorld(p, filepath):
         print("version=", root.attrib['version'])
 
     models = {}
-    log("Parsing models...", 'INFO')
+    if verbose:
+        log("Parsing models...", 'INFO')
     for model_xml in root.iter('model'):
-        log(" Adding link {}.".format(model_xml.attrib['name']), 'DEBUG')
+        if verbose:
+            log(" Adding link {}.".format(model_xml.attrib['name']), 'DEBUG')
         newmodel = parseModel(model_xml, "")
         models[model_xml.attrib['name']] = newmodel
         if 'uri' in newmodel.keys() and newmodel['uri'] is not None:
@@ -179,6 +184,7 @@ def parseWorld(p, filepath):
                 new_pos, new_orn = p.multiplyTransforms(pose_xyz, pose_orn, old_pos, old_orn)
                 p.resetBasePositionAndOrientation(b, new_pos, new_orn)
                 p.changeDynamics(b, -1, mass=0)
-            print("bodies=", bodies)
+            if verbose:
+                print("bodies=", bodies)
 
     return models
