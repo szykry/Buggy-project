@@ -52,6 +52,9 @@ class RacecarZEDGymEnv(gym.Env):
     self._height = 128    # 480 -> camera height
     self._prev_distance = 0
     self._prevState = "red"
+    self._direction = 1     # direction of moving object
+    self._mObjposA = [-2, -2, 0]
+    self._mObjposB = [0, 0, 0]
 
     if self._renders:
       self._p = bc.BulletClient(connection_mode=pybullet.GUI)
@@ -115,6 +118,8 @@ class RacecarZEDGymEnv(gym.Env):
     
     print(self._p.loadURDF(os.path.join(self._urdfRoot, "r2d2.urdf"), [finishLineX, finishLineY, finishLineZ]))
     '''
+    # load moving objects
+    self._movingObjectUniqueId = self._p.loadURDF(os.path.join(self._urdfRoot, "r2d2.urdf"), [0, 0, 1])
 
     # load the racecar
     self._racecar = racecar.Racecar(self._p, urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
@@ -220,6 +225,8 @@ class RacecarZEDGymEnv(gym.Env):
       if self._renders:
         time.sleep(self._timeStep)
 
+      self._strollingObject()       # object is strolling between position A and B
+
       self._observation = self.getExtendedObservation()
 
       if self._termination():
@@ -261,6 +268,34 @@ class RacecarZEDGymEnv(gym.Env):
 
   def _termination(self):
     return self._envStepCounter > self._terminationNum
+
+  def _strollingObject(self):
+      if self._direction > 0:
+          arrived = self._movingObject(self._movingObjectUniqueId, self._mObjposA, 0.1)
+          if arrived:
+              self._direction = -1
+      else:
+          arrived = self._movingObject(self._movingObjectUniqueId, self._mObjposB, 0.1)
+          if arrived:
+              self._direction = 1
+
+      return
+
+  def _movingObject(self, objId, toPos, eps):
+      obj_pos, _ = self._p.getBasePositionAndOrientation(objId)
+
+      force = 300 * (np.array(toPos) - np.array(obj_pos))   # log(x) ?
+      self._p.applyExternalForce(objectUniqueId=objId,
+                                 linkIndex=-1,
+                                 forceObj=force,
+                                 posObj=obj_pos,
+                                 flags=self._p.WORLD_FRAME)
+
+      d = self._distance2D(obj_pos, toPos)  # only 2D
+      if d < eps:   # object arrived
+          return True
+      else:
+          return False
 
   def _distance2D(self, posA, posB):
       return math.sqrt((posA[0]-posB[0])**2 + (posA[1]-posB[1])**2)
@@ -311,14 +346,13 @@ class RacecarZEDGymEnv(gym.Env):
     w2 = 1
     w3 = 1
     w4 = 1
-    w5 = 0
+    w5 = 1
 
     """timing should be tau -> end of the episode
     if got there: positive reward and new finish line"""
 
     # get car positions
     car_pos, car_orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
-
 
     # alpha
     finish_pos, finish_orn = self._p.getBasePositionAndOrientation(self._finishLineUniqueId)
@@ -375,18 +409,16 @@ class RacecarZEDGymEnv(gym.Env):
         delta = 0
 
     # epsilon
-    if False:
-        # moving objects are other urdfs -> this function can be used
-        mObjDist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
-                                            movingObjUniqueId,
-                                            10000)  # this is the max allowed distance
+    car_mObj_dist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
+                                             self._movingObjectUniqueId,
+                                             10000)  # this is the max allowed distance
+    if car_mObj_dist[0][8] < 1:
+        m = N.Normal(torch.tensor([0.0]), torch.tensor([1.0]))  # saturation - > gauss: mu-objektum -> 0
+        epsilon = 1 / m.log_prob(car_mObj_dist[0][8])
+    else:
+        epsilon = 0
 
-        if mObjDist < 1:
-            m = N.Normal(torch.tensor([0.0]), torch.tensor([1.0]))  # saturation - > gauss: mu-objektum -> 0
-            epsilon = 1 / m.log_prob(mObjDist[0][8])
-        else:
-            epsilon = 0
-
+    # calculating the reward
     reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon)
     print("reward:", reward)
     return reward
