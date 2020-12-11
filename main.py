@@ -18,7 +18,7 @@ def main():
 
     """Environment"""
     # NOTE: this wrapper automatically resets each env if the episode is done
-    env = SubprocVecEnv([make_env(render=True, rank=i, rollout=args.rollout_size) for i in range(args.num_envs)])
+    env = SubprocVecEnv([make_env(render=args.render, rank=i, rollout=args.rollout_size) for i in range(args.num_envs)])
 
     """Agent"""
     agent = ICMAgent(args.n_stack, args.num_envs, env.action_space.n, lr=args.lr)

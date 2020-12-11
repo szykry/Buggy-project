@@ -23,8 +23,6 @@ import torch.distributions.normal as N
 RENDER_HEIGHT = 720
 RENDER_WIDTH = 960
 
-randomMap = True
-
 
 class RacecarZEDGymEnv(gym.Env):
   metadata = {'render.modes': ['human', 'rgb_array'], 'video.frames_per_second': 60}
@@ -44,7 +42,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._timeStep = 0.02   # default is 240 Hz
     self._envStepCounter = 0
     self._prev_envStepCounter = 0
-    self._terminationNum = 1000 # max number of actions before reset
+    self._terminationNum = 2000 # max number of actions before reset
     self._cam_dist = 20
     self._cam_yaw = 50
     self._cam_pitch = -35
@@ -55,6 +53,8 @@ class RacecarZEDGymEnv(gym.Env):
     self._direction = 1                 # direction of moving object
     self._mObjposA = [4, -14.1, 0.9]    # moving object strolls between these positions
     self._mObjposB = [4, -15.8, 0.9]
+    self.randomMap = True
+    self.follow_car = 0
 
     if self._renders:
       self._p = bc.BulletClient(connection_mode=pybullet.GUI)
@@ -69,7 +69,8 @@ class RacecarZEDGymEnv(gym.Env):
     # reset
     self.seed()
     self.reset()
-    self.addDebug()
+    if self._renders:
+        self.addDebug()
 
     observationDim = len(self.getExtendedObservation())
 
@@ -89,7 +90,13 @@ class RacecarZEDGymEnv(gym.Env):
                                         dtype=np.uint8)
 
     self.viewer = None
-
+    self._w0Param = 1
+    self._w1Param = 1
+    self._w2Param = 1
+    self._w3Param = 1
+    self._w4Param = 1
+    self._w5Param = 1
+    self._velocityParam = 5
 
   def reset(self):
 
@@ -123,7 +130,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._racecar = racecar.Racecar(self._p, urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
     pos, orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
 
-    if randomMap:
+    if self.randomMap:
         newX = -10 + 4. * random.random()
         newY = -15.5
     else:
@@ -146,19 +153,33 @@ class RacecarZEDGymEnv(gym.Env):
     self._p = 0
 
   def addDebug(self):
-    # add button
-    self.button_id = self._p.addUserDebugParameter("button", 1, 0, 1)   # bug, still not working well
+    # add button    -> # still not working well !
+    self.button_id0 = self._p.addUserDebugParameter("random map", 1, 0, 1)
+    self.button_id1 = self._p.addUserDebugParameter("follow car", 0, 1, 0)
 
     # add slider
-    self.slider_id = self._p.addUserDebugParameter("slider", 0.0, 1.0, 0.0)
+    self.slider_id0 = self._p.addUserDebugParameter("reward (w0)", 0, 2, 1)
+    self.slider_id1 = self._p.addUserDebugParameter("alpha (w1)", 0, 2, 1)
+    self.slider_id2 = self._p.addUserDebugParameter("beta (w2)", 0, 2, 1)
+    self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 2, 1)
+    self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 2, 1)
+    self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 2, 1)
+    self.slider_id6 = self._p.addUserDebugParameter("velocity (moving obj)", 0, 10, 5)
 
   def updateDebug(self):
     """called in step function"""
     # read button
-    randomMap = self._p.readUserDebugParameter(self.button_id)
+    self.randomMap = self._p.readUserDebugParameter(self.button_id0)
+    self.follow_car = self._p.readUserDebugParameter(self.button_id1)
 
-    # read slider
-    dummy = self._p.readUserDebugParameter(self.slider_id)
+    # read sliders
+    self._w0Param = self._p.readUserDebugParameter(self.slider_id0)
+    self._w1Param = self._p.readUserDebugParameter(self.slider_id1)
+    self._w2Param = self._p.readUserDebugParameter(self.slider_id2)
+    self._w3Param = self._p.readUserDebugParameter(self.slider_id3)
+    self._w4Param = self._p.readUserDebugParameter(self.slider_id4)
+    self._w5Param = self._p.readUserDebugParameter(self.slider_id5)
+    self._velocityParam = self._p.readUserDebugParameter(self.slider_id6)
 
   def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
@@ -202,9 +223,9 @@ class RacecarZEDGymEnv(gym.Env):
     return self._observation
 
   def step(self, action):
-    if (self._renders):
+    if (self._renders and (self.follow_car > 0)):
       basePos, orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
-      # self._p.resetDebugVisualizerCamera(1, 30, -40, basePos)     # a button for this
+      self._p.resetDebugVisualizerCamera(2, -90, -40, basePos)
 
     if (self._isDiscrete):
       fwd = [-1, -1, -1, 0, 0, 0, 1, 1, 1]
@@ -222,6 +243,7 @@ class RacecarZEDGymEnv(gym.Env):
 
       if self._renders:
         time.sleep(self._timeStep)
+        self.updateDebug()
 
       self._strollingObject()       # object is strolling between position A and B
 
@@ -235,8 +257,6 @@ class RacecarZEDGymEnv(gym.Env):
     reward = self._reward()
     done = self._termination()  # resets the environment
     #print("len=%r" % len(self._observation))
-
-    self.updateDebug()
 
     return np.array(self._observation), reward, done, {}
 
@@ -282,8 +302,9 @@ class RacecarZEDGymEnv(gym.Env):
   def _movingObject(self, objId, toPos, eps):
       obj_pos, _ = self._p.getBasePositionAndOrientation(objId)
       d = self._distance2D(obj_pos, toPos)  # only 2D
-
-      self._p.resetBaseVelocity(objId, [0, -5*self._direction, 0])      # should be tunable
+      dir = self._direction
+      amp = self._velocityParam
+      self._p.resetBaseVelocity(objId, [0, -amp*dir, 0])
 
       if d < eps:   # object arrived
           return True
@@ -334,12 +355,12 @@ class RacecarZEDGymEnv(gym.Env):
     epsilon = 0     # discrete reward: avoiding moving objects (1/x)
 
     # weights for the different rewards, these should be tuned via sliders
-    w0 = 1
-    w1 = 1
-    w2 = 1
-    w3 = 1
-    w4 = 1
-    w5 = 1
+    w0 = self._w0Param
+    w1 = self._w1Param
+    w2 = self._w2Param
+    w3 = self._w3Param
+    w4 = self._w4Param
+    w5 = self._w5Param
 
     """timing should be tau -> end of the episode
     if got there: positive reward and new finish line"""
@@ -360,11 +381,15 @@ class RacecarZEDGymEnv(gym.Env):
                                       length=32,
                                       width=15,         # width should be the same as radius
                                       radius=14.75)     # traffic line is the zero point
-    distBetweenLanes = 1.2                # hard coded
-    mu = distBetweenLanes/2.0     # shifted to the middle of the track
-    sig = mu/3.0                        # 3 sigma -> 99.7%
+    distBetweenLanes = 1.2                  # hard coded
+    mu = distBetweenLanes/2.0               # shifted to the middle of the track
+    sig = mu/3.0                            # 3 sigma -> 99.7%
     m = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
-    beta = m.log_prob(x).item()     # = ln(Normal)-> returns tensor      ? saturation
+    if (x >= 1.2) or (x <= -1.2):                # off-road
+        beta = -100                         # huge error
+    else:
+        beta = m.log_prob(x).item()         # = ln(Normal) -> returns tensor
+
 
     # gamma
     tLight_pos = self._mapObjects["aws_robomaker_racetrack_RaceStartLight_01_00"]["pose_xyz"]

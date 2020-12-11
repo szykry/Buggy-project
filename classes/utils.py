@@ -28,6 +28,8 @@ def get_args():
     # environment
     parser.add_argument('--env-name', type=str, default='RacecarZEDGymEnv',
                         help='environment name')
+    parser.add_argument('--render', action='store_true', default=True,
+                        help='rendering is on')
     parser.add_argument('--num-envs', type=int, default=1, metavar='NUM_ENVS',
                         help='number of parallel environemnts')
     parser.add_argument('--n-stack', type=int, default=4, metavar='N_STACK',
