@@ -53,8 +53,8 @@ class Runner(object):
         self.storage.states[0].copy_(self.storage.obs2tensor(obs))
         best_loss = np.inf
 
-        for num_update in range(self.num_updates):
-
+        for num_update in range(self.num_updates):          # reset at 200
+            print("---------------------------roll out---------------------------")
             final_value, entropy = self.episode_rollout()
 
             self.net.optimizer.zero_grad()
