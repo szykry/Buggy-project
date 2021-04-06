@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -51,11 +52,11 @@ class Runner(object):
         """Environment reset"""
         obs = self.env.reset()  # this is a second reset!
         self.storage.states[0].copy_(self.storage.obs2tensor(obs))
-        best_loss = np.inf
+        best_reward = -np.inf
 
-        for num_update in range(self.num_updates):          # reset at 200
-            print("---------------------------roll out---------------------------")
-            final_value, entropy = self.episode_rollout()
+        for num_update in range(self.num_updates):  # reset at 2000/(5*5)=80 -> envCounter/(actRepeat*ep_roll_out)
+            print("---------------------------roll out: ", num_update, "---------------------------")
+            final_value, entropy, mean_reward = self.episode_rollout()
 
             self.net.optimizer.zero_grad()
 
@@ -74,17 +75,17 @@ class Runner(object):
             # it stores a lot of data which let's the graph
             # grow out of memory, so it is crucial to reset
             self.storage.after_update()
-
-            if loss < best_loss:
-                best_loss = loss.item()
-                print("model saved with best loss: ", best_loss, " at update #", num_update)
-                torch.save(self.net.state_dict(), "a2c_best_loss")
+            print("mean: ", mean_reward)
+            if mean_reward > best_reward:
+                best_reward = mean_reward
+                print("model saved with best reward: ", best_reward, " at update #", num_update)
+                torch.save(self.net.state_dict(), "a2c_best_reward")
 
             elif num_update % 10 == 0:
                 print("current loss: ", loss.item(), " at update #", num_update)
                 self.storage.print_reward_stats()
 
-            elif num_update % 100 == 0:
+            elif num_update % 100 == 0:         # this will never run
                 torch.save(self.net.state_dict(), "a2c_time_log_no_norm")
 
             if self.writer is not None and len(self.storage.episode_rewards) > 1:
@@ -94,6 +95,7 @@ class Runner(object):
 
     def episode_rollout(self):
         episode_entropy = 0
+        episode_reward = 0
         for step in range(self.rollout_size):
             """Interact with the environments """
             # call A2C
@@ -103,6 +105,7 @@ class Runner(object):
 
             # interact
             obs, rewards, dones, infos = self.env.step(a_t.cpu().numpy())
+            episode_reward += rewards
 
             # save episode reward
             self.storage.log_episode_rewards(infos)
@@ -110,6 +113,8 @@ class Runner(object):
             self.storage.insert(step, rewards, obs, a_t, log_p_a_t, value, dones)
             self.net.a2c.reset_recurrent_buffers(reset_indices=dones)
 
+        episode_reward /= self.rollout_size
+        episode_reward = max(episode_reward)
         # Note:
         # get the estimate of the final reward
         # that's why we have the CRITIC --> estimate final reward
@@ -117,4 +122,4 @@ class Runner(object):
         with torch.no_grad():
             _, _, _, final_value, final_features = self.net.a2c.get_action(self.storage.get_state(step + 1))
 
-        return final_value, episode_entropy
+        return final_value, episode_entropy, episode_reward

@@ -16,7 +16,7 @@ def get_args():
                         help='CUDA flag')
     parser.add_argument('--tensorboard', action='store_true', default=True,
                         help='log with Tensorboard')
-    parser.add_argument('--log-dir', type=str, default="../log/a2c",
+    parser.add_argument('--log-dir', type=str, default="../buggy/logs/a2c",
                         help='log directory for Tensorboard')
     parser.add_argument('--seed', type=int, default=42, metavar='SEED',
                         help='random seed')
@@ -28,10 +28,10 @@ def get_args():
     # environment
     parser.add_argument('--env-name', type=str, default='RacecarZEDGymEnv',
                         help='environment name')
-    parser.add_argument('--render', action='store_true', default=True,
+    parser.add_argument('--render', action='store_true', default=False,
                         help='rendering is on')
     parser.add_argument('--num-envs', type=int, default=1, metavar='NUM_ENVS',
-                        help='number of parallel environemnts')
+                        help='number of parallel environments')
     parser.add_argument('--n-stack', type=int, default=4, metavar='N_STACK',
                         help='number of frames stacked')
     parser.add_argument('--rollout-size', type=int, default=5, metavar='ROLLOUT_SIZE',

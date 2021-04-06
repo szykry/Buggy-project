@@ -64,7 +64,7 @@ class RacecarZEDGymEnv(gym.Env):
     # objects
     self._finishLineUniqueId = None
     self._mapObjects = None
-    self._staticObjects = {}
+    self._stationaryObjects = {}
 
     # reset
     self.seed()
@@ -91,14 +91,22 @@ class RacecarZEDGymEnv(gym.Env):
 
     self.viewer = None
     self._w0Param = 1
-    self._w1Param = 1
-    self._w2Param = 1
-    self._w3Param = 1
-    self._w4Param = 1
-    self._w5Param = 1
+    self._w1Param = 30
+    self._w2Param = 0
+    self._w3Param = 0
+    self._w4Param = 0
+    self._w5Param = 0
     self._velocityParam = 5
 
   def reset(self):
+    self._firstAlpha = True
+    self._w0Param = 1
+    self._w1Param = 50
+    self._w2Param = 1
+    self._w3Param = 0
+    self._w4Param = 0
+    self._w5Param = 0
+    self._velocityParam = 5
 
     self._p.resetSimulation()
     #p.setPhysicsEngineParameter(numSolverIterations=300)
@@ -111,10 +119,10 @@ class RacecarZEDGymEnv(gym.Env):
     # set finish line
     self._finishLineUniqueId = 5     # aws_robomaker_racetrack_Billboard_01 (hard coded)
 
-    # select static objects
+    # select _stationaryObjects objects
     for k, v in self._mapObjects.items():  # nested dict
         if k[-1] == "S":
-            self._staticObjects.update({k: v})
+            self._stationaryObjects.update({k: v})
 
     '''
     mapObjects = self._p.loadSDF(os.path.join(self._urdfRoot, "buggy.sdf"))
@@ -158,12 +166,12 @@ class RacecarZEDGymEnv(gym.Env):
     self.button_id1 = self._p.addUserDebugParameter("follow car", 0, 1, 0)
 
     # add slider
-    self.slider_id0 = self._p.addUserDebugParameter("reward (w0)", 0, 2, 1)
-    self.slider_id1 = self._p.addUserDebugParameter("alpha (w1)", 0, 2, 1)
-    self.slider_id2 = self._p.addUserDebugParameter("beta (w2)", 0, 2, 1)
-    self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 2, 1)
-    self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 2, 1)
-    self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 2, 1)
+    self.slider_id0 = self._p.addUserDebugParameter("reward (w0)", 0, 10, 1)
+    self.slider_id1 = self._p.addUserDebugParameter("alpha (w1)", 0, 100, 30)
+    self.slider_id2 = self._p.addUserDebugParameter("beta (w2)", 0, 10, 0)
+    self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 0)
+    self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 10, 0)
+    self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 10, 0)
     self.slider_id6 = self._p.addUserDebugParameter("velocity (moving obj)", 0, 10, 5)
 
   def updateDebug(self):
@@ -256,6 +264,8 @@ class RacecarZEDGymEnv(gym.Env):
 
     reward = self._reward()
     done = self._termination()  # resets the environment
+    if done:
+        print("---------------------------new episode---------------------------")
     #print("len=%r" % len(self._observation))
 
     return np.array(self._observation), reward, done, {}
@@ -348,11 +358,11 @@ class RacecarZEDGymEnv(gym.Env):
 
   def _reward(self):
     # initial reward
-    alpha = -1000   # continuous reward: distance from the finish line (linear)
-    beta = 0        # continuous reward: positon in a lane (gauss)
+    alpha = 0       # continuous reward: distance from the finish line (linear)
+    beta = 0        # continuous reward: positon in a lane (gauss -> parabola)
     gamma = 0       # discrete reward: stopping at traffic lights (linear)
-    delta = 0       # discrete reward: avoiding static objects (1/x)
-    epsilon = 0     # discrete reward: avoiding moving objects (1/x)
+    delta = 0       # discrete reward: avoiding stationary objects (exp)
+    epsilon = 0     # discrete reward: avoiding moving objects (exp)
 
     # weights for the different rewards, these should be tuned via sliders
     w0 = self._w0Param
@@ -370,7 +380,10 @@ class RacecarZEDGymEnv(gym.Env):
 
     # alpha
     finish_pos, finish_orn = self._p.getBasePositionAndOrientation(self._finishLineUniqueId)
-    car_fin_dist = self._distance3D(car_pos, finish_pos)
+    car_fin_dist = self._distance2D(car_pos, finish_pos)
+    if self._firstAlpha:
+        self._prev_distance = car_fin_dist             # fixing the huge error in the first step
+        self._firstAlpha = False
     alpha = -(car_fin_dist - self._prev_distance)      # distance difference
     self._prev_distance = car_fin_dist
 
@@ -378,14 +391,14 @@ class RacecarZEDGymEnv(gym.Env):
     center = self._mapObjects["aws_robomaker_racetrack_Trackline_01"]["pose_xyz"]
     x = self._distanceFromTrafficLine(car_pos=car_pos,
                                       center=center,
-                                      length=32,
+                                      length=32,        # measured data
                                       width=15,         # width should be the same as radius
                                       radius=14.75)     # traffic line is the zero point
     distBetweenLanes = 1.2                  # hard coded
     mu = distBetweenLanes/2.0               # shifted to the middle of the track
     sig = mu/3.0                            # 3 sigma -> 99.7%
     m = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
-    if (x >= 1.2) or (x <= -1.2):                # off-road
+    if (x >= 1.2) or (x <= -1.2):           # off-road
         beta = -100                         # huge error
     else:
         beta = m.log_prob(x).item()         # = ln(Normal) -> returns tensor
@@ -400,45 +413,44 @@ class RacecarZEDGymEnv(gym.Env):
     if tLight == "green":
       gamma = 0
     else:
-        if (car_light_dist > 0.5 and car_light_dist < 2):                       # agent stops within 2 meters
+        if (car_light_dist > 0.5 and car_light_dist < 2):                           # agent stops within 2 meters
             velocity_vector = math.sqrt(velocity[0][0] ** 2 + velocity[0][1] ** 2)  # sqrt(vx^2 + vy^2)
             gamma = -velocity_vector
-
-        elif (car_light_dist < 0.5):                          # agent is too close
-            gamma = -100                                        # huge error
-
+        elif (car_light_dist < 0.5):                # agent is too close
+            gamma = -100                            # huge error
         else:
             gamma = 0
 
     # delta
-    nearest = 1000
-    sObj_pos = []
+    if False:
+        nearest = 1
+        sObj_pos = []
 
-    for i, k in enumerate(self._staticObjects.keys()):
-        sObj_pos.append(self._staticObjects[k]["pose_xyz"])
-        car_sObj_dist = self._distance3D(car_pos, sObj_pos[i])
+        for i, k in enumerate(self._stationaryObjects.keys()):
+            sObj_pos.append(self._stationaryObjects[k]["pose_xyz"])
+            car_sObj_dist = self._distance3D(car_pos, sObj_pos[i])
 
-        if car_sObj_dist < nearest:
-            nearest = car_sObj_dist
+            if car_sObj_dist < nearest:
+                nearest = car_sObj_dist
 
-    if nearest < 1:
-        delta = - math.exp(-(nearest**2))
-    else:
-        delta = 0
+        if nearest < 1:
+            delta = - math.exp(-(nearest**2))
+        else:
+            delta = 0
 
     # epsilon
     car_mObj_dist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
                                              self._movingObjectUniqueId,
                                              10000)  # this is the max allowed distance
     if car_mObj_dist[0][8] < 1:
-        m = N.Normal(torch.tensor([0.0]), torch.tensor([1.0]))  # saturation - > gauss: mu-objektum -> 0
-        epsilon = 1 / m.log_prob(car_mObj_dist[0][8])
+        m = N.Normal(torch.tensor([0.0]), torch.tensor([w5]))  # sigma=1/w5 -> no huge step between the values at x=1
+        epsilon = 1 / m.log_prob(car_mObj_dist[0][8]).item()
     else:
         epsilon = 0
 
     # calculating the reward
     reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon)
-    print("reward:", reward)
+    #print("reward:", reward)
     return reward
 
   if parse_version(gym.__version__) < parse_version('0.9.6'):
