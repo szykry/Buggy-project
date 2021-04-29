@@ -30,6 +30,12 @@ class RolloutStorage(object):
         self.writer = writer
 
         # initialize the buffers with zeros
+        self.rewards = None
+        self.states = None
+        self.actions = None
+        self.log_probs = None
+        self.values = None
+        self.dones = None
         self.reset_buffers()
 
     def _generate_buffer(self, size):
@@ -93,12 +99,14 @@ class RolloutStorage(object):
         return self.states[step].clone()
 
     def obs2tensor(self, obs):
-        # obs = tuple(1, 128, 128, 4) =>  picture(8bit): 1, height, width, channel(RGBD)
-        # tensor = [6, 1, 4, 128, 128] => [rollout+1, num_envs, stacked_frames, env_obs_frame_shape]
-        tensor = torch.tensor(obs[0])
-        tensor = tensor.permute(2, 0, 1)
-        t = torch.zeros(1, 4, 128, 128)
-        t[0] = tensor / 255.        # -> need normalization?
+        """
+        Create tensor from tuple of observations.
+        :param obs: tuple(num_env, stacked_frames, height, width, channel(RGBD))  e.g. (4, 5, 128, 128, 4)
+        :return: Tensor [num_envs, stacked_frames, channel, env_obs_frame_shape] e.g.  [4, 5, 4, 128, 128]
+        """
+        tensor = torch.tensor(obs)
+        tensor = tensor.permute(0, 1, 4, 2, 3)
+        t = tensor / 255.   # -> need normalization?
         return t.cuda() if self.is_cuda else t
 
     def insert(self, step, reward, obs, action, log_prob, value, dones):

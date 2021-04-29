@@ -34,9 +34,16 @@ class Runner(object):
         """Environment"""
         self.env = env
 
-        self.storage = RolloutStorage(self.rollout_size, self.num_envs, self.env.observation_space.shape[0:-1],
-                                      self.n_stack, is_cuda=self.is_cuda, value_coeff=value_coeff,
-                                      entropy_coeff=entropy_coeff, writer=self.writer)
+        frame_shape = self.env.observation_space.shape
+        permuted_frame_shape = (frame_shape[2], frame_shape[0], frame_shape[1])
+        self.storage = RolloutStorage(rollout_size=self.rollout_size,
+                                      num_envs=self.num_envs,
+                                      frame_shape=permuted_frame_shape,
+                                      n_stack=self.n_stack,
+                                      is_cuda=self.is_cuda,
+                                      value_coeff=value_coeff,
+                                      entropy_coeff=entropy_coeff,
+                                      writer=self.writer)
 
         """Network"""
         self.net = net
@@ -55,7 +62,7 @@ class Runner(object):
         best_reward = -np.inf
 
         for num_update in range(self.num_updates):  # reset at 2000/(5*5)=80 -> envCounter/(actRepeat*ep_roll_out)
-            print("---------------------------roll out: ", num_update, "---------------------------")
+            print("---------------------------roll out: {}---------------------------".format(num_update))
             final_value, entropy, mean_reward = self.episode_rollout()
 
             self.net.optimizer.zero_grad()
@@ -112,6 +119,9 @@ class Runner(object):
 
             self.storage.insert(step, rewards, obs, a_t, log_p_a_t, value, dones)
             self.net.a2c.reset_recurrent_buffers(reset_indices=dones)
+
+            if dones[0]:
+                print("---------------------------new episode---------------------------")
 
         episode_reward /= self.rollout_size
         episode_reward = max(episode_reward)

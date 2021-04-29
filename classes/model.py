@@ -1,9 +1,11 @@
 from pdb import set_trace
+import math
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+from torch.nn.modules.activation import MultiheadAttention
 
 
 def init(module, weight_init, bias_init, gain=1):
@@ -20,6 +22,13 @@ def init(module, weight_init, bias_init, gain=1):
     return module
 
 
+def attention_block(sequence, posenc, mha):
+    pe = posenc(sequence)
+    attn_output, _ = mha(pe, pe, pe)
+    attn_avg = torch.sum(attn_output, 1) / attn_output.size(1)
+    return attn_avg
+
+
 class ConvBlock(nn.Module):
 
     def __init__(self, ch_in=4):
@@ -27,15 +36,13 @@ class ConvBlock(nn.Module):
         A basic block of convolutional layers,
         consisting: - 4 Conv2d
                     - LeakyReLU (after each Conv2d)
-                    - currently also an AvgPool2d (I know, a place for me is reserved in hell for that)
 
-        :param ch_in: number of input channels, which is equivalent to the number
-                      of frames stacked together
+        :param ch_in: number of input channels, default=4 (RGBD image)
         """
         super().__init__()
 
         # constants
-        self.num_filter = 32
+        self.num_filter = 8
         self.size = 3
         self.stride = 2
         self.pad = self.size // 2
@@ -43,10 +50,12 @@ class ConvBlock(nn.Module):
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
                                constant_(x, 0), nn.init.calculate_gain('leaky_relu'))
         # layers
+        # strided convolutions -> downscaling (128, 64, 16, 4, 1)
+        # channels: 8, 32, 128, 512 -> output: [env_num, 512, 1, 1]
         self.conv1 = init_(nn.Conv2d(ch_in, self.num_filter, self.size, self.stride, self.pad))
-        self.conv2 = init_(nn.Conv2d(self.num_filter, self.num_filter, self.size, self.stride, self.pad))
-        self.conv3 = init_(nn.Conv2d(self.num_filter, self.num_filter, self.size, self.stride, self.pad))
-        self.conv4 = init_(nn.Conv2d(self.num_filter, self.num_filter, self.size, self.stride, self.pad))
+        self.conv2 = init_(nn.Conv2d(self.num_filter, self.num_filter*4, self.size, self.stride*2, self.pad))
+        self.conv3 = init_(nn.Conv2d(self.num_filter*4, self.num_filter*16, self.size, self.stride*2, self.pad))
+        self.conv4 = init_(nn.Conv2d(self.num_filter*16, self.num_filter*64, self.size, self.stride*2, self.pad))
 
     def forward(self, x):
         x = F.leaky_relu(self.conv1(x))
@@ -54,29 +63,66 @@ class ConvBlock(nn.Module):
         x = F.leaky_relu(self.conv3(x))
         x = F.leaky_relu(self.conv4(x))
 
-        x = nn.AvgPool2d(2)(x)  # needed as the input image is 84x84, not 42x42
-        # return torch.flatten(x)
-        # set_trace()
         return x.view(x.shape[0], -1)  # retain batch size
 
 
-class FeatureEncoderNet(nn.Module):
-    def __init__(self, n_stack, in_size, is_lstm=True):
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000, dropout=0.1):
         """
-        Network for feature encoding
+        Using sinusoidal position encoding.
+        :param d_model: Hidden dimensionality of the input.
+        :param max_len: Maximum length of a sequence to expect. i.e. maximum number of stacked frames
+        :param dropout: Optionally nn.Dropout with dropout probability
+        """
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
 
-        :param n_stack: number of frames stacked beside each other (passed to the CNN)
+        # Create matrix of [SeqLen, HiddenDim] representing the positional encoding for max_len inputs
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        # pe = pe.unsqueeze(0).transpose(0, 1)            # [SeqLen, 1, HiddenDim]
+
+        # register_buffer => Tensor which is not a parameter, but should be part of the modules state.
+        # Used for tensors that need to be on the same device as the module.
+        # persistent=False tells PyTorch to not add the buffer to the state dict (e.g. when we save the model)
+        self.register_buffer('pe', pe, persistent=False)
+
+    def forward(self, x):
+        """
+        Calculate positional encoded sequence. Encode through the length of the input.
+        :param x: [num_env, in_len, hidden_dim]
+        :return: [num_env, in_len, hidden_dim]
+        """
+        x = x + self.pe[:x.size(1)]
+        return self.dropout(x)
+
+
+class FeatureEncoderNet(nn.Module):
+    def __init__(self, in_channel, in_size, is_mha=False, max_len=5000, is_lstm=False):
+        """
+        Network for feature encoding.
+        :param in_channel: number of input channels
         :param in_size: input size of the LSTMCell if is_lstm==True else it's the output size
-        :param is_lstm: flag to indicate wheter an LSTMCell is included after the CNN
+        :param is_mha: flag to indicate whether a Multi-head Attention block is included after the CNN
+        :param is_lstm: flag to indicate whether an LSTMCell is included after the CNN or the M-h Attention
         """
         super().__init__()
         # constants
         self.in_size = in_size
-        self.h1 = 512       # 288  (32 x 3 x 3)?
+        self.h1 = 512
+        self.is_mha = is_mha    # indicates whether the Multi-head Attention is needed
         self.is_lstm = is_lstm  # indicates whether the LSTM is needed
 
         # layers
-        self.conv = ConvBlock(ch_in=n_stack)
+        self.conv = ConvBlock(in_channel)
+
+        if self.is_mha:
+            self.is_lstm = True     # always use LSTM cell after Attention
+            self.posenc = PositionalEncoding(d_model=self.in_size, max_len=max_len)
+            self.mha = MultiheadAttention(embed_dim=self.in_size, num_heads=2)      # embed_dim % num_heads = 0
         if self.is_lstm:
             self.lstm = nn.LSTMCell(input_size=self.in_size, hidden_size=self.h1)
 
@@ -105,52 +151,55 @@ class FeatureEncoderNet(nn.Module):
 
     def forward(self, x):
         """
+        states: [4, 5, 4, 128, 128] -> states: [20, 4, 128, 128] -> features: [20, 512] -> features: [4, 5, 512]
+        -> (pos_enc: [4, 5, 512] -> attention: [4, 5, 512]) -> (lstm_input: [4, 512]) -> output: [4, 512]
         In: [s_t]
-            Current state (i.e. pixels) -> 1 channel image is needed
+            Current state (i.e. pixels) -> [num_env, n_stack, rgbd, h, w]
 
         Out: phi(s_t)
             Current state transformed into feature space
 
         :param x: input data representing the current state
-        :return:
+        :return: encoded features for the actor and critic heads
         """
+        input = x.view(-1, x.size(2), x.size(3), x.size(4))
+        feat = self.conv(input)
+        mha_input = feat.view(x.size(0), x.size(1), -1)
+        lstm_input = feat
+        output = feat
 
-        x = self.conv(x)    # [1, 4, 128, 128] -> [1, 512]
-
-        # return self.lin(x)
+        if self.is_mha:
+            lstm_input = attention_block(mha_input, self.posenc, self.mha)
 
         if self.is_lstm:
-            x = x.view(-1, self.in_size)
-            # set_trace()
-            self.h_t1, self.c_t1 = self.lstm(x, (self.h_t1, self.c_t1))  # h_t1 is the output
-            return self.h_t1  # [:, -1, :]#.reshape(-1)
+            self.h_t1, self.c_t1 = self.lstm(lstm_input, (self.h_t1, self.c_t1))    # h_t1 is the output
+            output = self.h_t1                                                      # [:, -1, :] .reshape(-1)
 
-        else:
-            return x.view(-1, self.in_size)
+        return output
 
 
 class A2CNet(nn.Module):
-    def __init__(self, n_stack, num_actions, in_size=512, writer=None):
+    def __init__(self, in_channel, num_actions, in_size=512, is_mha=False, max_len=5000, is_lstm=False, writer=None):
         """
         Implementation of the Advantage Actor-Critic (A2C) network
 
-        :param n_stack: number of frames stacked
+        :param in_channel: number of input channels
         :param num_actions: size of the action space, pass env.action_space.n
-        :param in_size: input size of the LSTMCell of the FeatureEncoderNet     -> 288
+        :param in_size: input size of the LSTMCell of the FeatureEncoderNet
         """
         super().__init__()
 
         self.writer = writer
 
         # constants
-        self.in_size = in_size  # in_size
+        self.in_size = in_size
         self.num_actions = num_actions
 
         # networks
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
                                constant_(x, 0))
 
-        self.feat_enc_net = FeatureEncoderNet(n_stack, self.in_size)
+        self.feat_enc_net = FeatureEncoderNet(in_channel, self.in_size, is_mha=is_mha, max_len=max_len, is_lstm=is_lstm)
         self.actor = init_(nn.Linear(self.feat_enc_net.h1, self.num_actions))  # estimates what to do
         self.critic = init_(nn.Linear(self.feat_enc_net.h1,
                                       1))  # estimates how good the value function (how good the current state is)
@@ -176,13 +225,9 @@ class A2CNet(nn.Module):
 
     def forward(self, state):
         """
-
-        feature: current encoded state
-
         :param state: current state
-        :return:
+        :return: policy, value, feature (current encoded state)
         """
-
         # encode the state
         feature = self.feat_enc_net(state)
 

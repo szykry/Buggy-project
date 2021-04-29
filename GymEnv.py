@@ -154,8 +154,9 @@ class RacecarZEDGymEnv(gym.Env):
       self._p.stepSimulation()
 
     self._observation = self.getExtendedObservation()
+    obs = np.array(self._observation)
 
-    return np.array(self._observation)
+    return [obs, obs, obs, obs, obs]
 
   def __del__(self):
     self._p = 0
@@ -196,12 +197,14 @@ class RacecarZEDGymEnv(gym.Env):
   def getExtendedObservation(self):
     carpos, carorn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
     carmat = self._p.getMatrixFromQuaternion(carorn)
+    """
     finishLinepos, finishLineorn = self._p.getBasePositionAndOrientation(self._finishLineUniqueId)
     invCarPos, invCarOrn = self._p.invertTransform(carpos, carorn)
     finishLinePosInCar, finishLineOrnInCar = self._p.multiplyTransforms(invCarPos,
                                                                         invCarOrn,
                                                                         finishLinepos,
                                                                         finishLineorn)
+                                                                        """
     dist0 = 0.3
     dist1 = 1.
     eyePos = [
@@ -214,7 +217,7 @@ class RacecarZEDGymEnv(gym.Env):
     ]
     up = [carmat[2], carmat[5], carmat[8]]
     viewMat = self._p.computeViewMatrix(eyePos, targetPos, up)
-    #viewMat = self._p.computeViewMatrixFromYawPitchRoll(carpos,1,0,0,0,2)
+    # viewMat = self._p.computeViewMatrixFromYawPitchRoll(carpos,1,0,0,0,2)
 
     projMatrix = [
         0.7499999403953552, 0.0, 0.0, 0.0,
@@ -225,17 +228,18 @@ class RacecarZEDGymEnv(gym.Env):
                                      height=self._height,
                                      viewMatrix=viewMat,
                                      projectionMatrix=projMatrix)
+
     rgb = img_arr[2]
     np_img_arr = np.reshape(rgb, (self._height, self._width, 4))
     self._observation = np_img_arr
     return self._observation
 
   def step(self, action):
-    if (self._renders and (self.follow_car > 0)):
+    if self._renders and (self.follow_car > 0):
       basePos, orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
       self._p.resetDebugVisualizerCamera(2, -90, -40, basePos)
 
-    if (self._isDiscrete):
+    if self._isDiscrete:
       fwd = [-1, -1, -1, 0, 0, 0, 1, 1, 1]
       steerings = [-0.6, 0, 0.6, -0.6, 0, 0.6, -0.6, 0, 0.6]
       forward = fwd[action]
@@ -246,6 +250,7 @@ class RacecarZEDGymEnv(gym.Env):
 
     self._racecar.applyAction(realaction)
 
+    observations = []
     for i in range(self._actionRepeat):
       self._p.stepSimulation()
 
@@ -256,6 +261,7 @@ class RacecarZEDGymEnv(gym.Env):
       self._strollingObject()       # object is strolling between position A and B
 
       self._observation = self.getExtendedObservation()
+      observations.append(np.array(self._observation))
 
       if self._termination():
         break
@@ -264,11 +270,8 @@ class RacecarZEDGymEnv(gym.Env):
 
     reward = self._reward()
     done = self._termination()  # resets the environment
-    if done:
-        print("---------------------------new episode---------------------------")
-    #print("len=%r" % len(self._observation))
 
-    return np.array(self._observation), reward, done, {}
+    return observations, reward, done, {}
 
   def render(self, mode='human', close=False):
     if mode != "rgb_array":
@@ -450,7 +453,7 @@ class RacecarZEDGymEnv(gym.Env):
 
     # calculating the reward
     reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon)
-    #print("reward:", reward)
+    print("reward:", reward)
     return reward
 
   if parse_version(gym.__version__) < parse_version('0.9.6'):

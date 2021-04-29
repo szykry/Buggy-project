@@ -30,16 +30,20 @@ def get_args():
                         help='environment name')
     parser.add_argument('--render', action='store_true', default=False,
                         help='rendering is on')
-    parser.add_argument('--num-envs', type=int, default=1, metavar='NUM_ENVS',
+    parser.add_argument('--num-envs', type=int, default=4, metavar='NUM_ENVS',
                         help='number of parallel environments')
-    parser.add_argument('--n-stack', type=int, default=4, metavar='N_STACK',
-                        help='number of frames stacked')
+    parser.add_argument('--n-stack', type=int, default=5, metavar='N_STACK',
+                        help='number of frames stacked = action-repetition')
     parser.add_argument('--rollout-size', type=int, default=5, metavar='ROLLOUT_SIZE',
                         help='rollout size')
     parser.add_argument('--num-updates', type=int, default=2500000, metavar='NUM_UPDATES',
                         help='number of updates')
 
-    # model coefficients
+    # model parameters and coefficients
+    parser.add_argument('--attention', action='store_true', default=True,
+                        help='use multi-head attention for feature encoding')
+    parser.add_argument('--lstm', action='store_true', default=False,
+                        help='use lstm cell for feature encoding')
     parser.add_argument('--curiosity-coeff', type=float, default=.015, metavar='CURIOSITY_COEFF',
                         help='curiosity-based exploration coefficient')
     parser.add_argument('--icm-beta', type=float, default=.2, metavar='ICM_BETA',

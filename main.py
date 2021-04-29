@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import random
-from torch.nn.modules.activation import MultiheadAttention
+
 from pybullet_envs.bullet.racecarZEDGymEnv import RacecarZEDGymEnv
 from stable_baselines.common.vec_env import SubprocVecEnv
 
@@ -18,10 +18,10 @@ def main():
 
     """Environment"""
     # NOTE: this wrapper automatically resets each env if the episode is done
-    env = SubprocVecEnv([make_env(render=args.render, rank=i, rollout=args.rollout_size) for i in range(args.num_envs)])
+    env = SubprocVecEnv([make_env(render=args.render, rank=i, action_repeat=args.n_stack) for i in range(args.num_envs)])
 
     """Agent"""
-    agent = ICMAgent(args.n_stack, args.num_envs, env.action_space.n, lr=args.lr)
+    agent = ICMAgent(4, args.num_envs, env.action_space.n, lr=args.lr, action_repeat=args.n_stack, is_mha=args.attention, is_lstm=args.lstm)
 
     """Train"""
     runner = Runner(agent, env, args.num_envs, args.n_stack, args.rollout_size, args.num_updates,
@@ -30,7 +30,7 @@ def main():
     runner.train()
 
 
-def make_env(render, rank, rollout=10, seed=0):
+def make_env(render, rank, action_repeat=10, seed=0):
     """
     :param render: (boolean) renders the env if True
     :param rank: (int) index of the subprocess
@@ -39,7 +39,7 @@ def make_env(render, rank, rollout=10, seed=0):
     """
 
     def _init():
-        env = RacecarZEDGymEnv(renders=render, isDiscrete=True, actionRepeat=rollout)
+        env = RacecarZEDGymEnv(renders=render, isDiscrete=True, actionRepeat=action_repeat)
         env.seed(seed + rank)
         env.render(mode="human")
         return env
@@ -54,4 +54,3 @@ def make_env(render, rank, rollout=10, seed=0):
 if __name__ == '__main__':
 
     main()
-    # mha = MultiheadAttention(embed_dim=2, num_heads=2)          # embed_dim % num_heads = 0
