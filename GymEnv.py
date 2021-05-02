@@ -101,8 +101,8 @@ class RacecarZEDGymEnv(gym.Env):
   def reset(self):
     self._firstAlpha = True
     self._w0Param = 1
-    self._w1Param = 50
-    self._w2Param = 1
+    self._w1Param = 30
+    self._w2Param = 0
     self._w3Param = 0
     self._w4Param = 0
     self._w5Param = 0
