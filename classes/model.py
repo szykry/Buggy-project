@@ -23,9 +23,16 @@ def init(module, weight_init, bias_init, gain=1):
 
 
 def attention_block(sequence, posenc, mha):
+    """
+    Runs multi-head attention with positional encoding.
+    :param sequence: Tensor of input sequence [num_env, batch, feature]
+    :param posenc: Positional Encoding module
+    :param mha: Multi-Head Attention module
+    :return: Tensor of output sequence [num_env, feature]
+    """
     pe = posenc(sequence)
     attn_output, _ = mha(pe, pe, pe)
-    attn_avg = torch.sum(attn_output, 1) / attn_output.size(1)
+    attn_avg = torch.sum(attn_output, 1) / attn_output.size(1)  # Calculate average of batches [N, B, F] -> [N, F]
     return attn_avg
 
 
@@ -164,18 +171,20 @@ class FeatureEncoderNet(nn.Module):
         """
         input = x.view(-1, x.size(2), x.size(3), x.size(4))
         feat = self.conv(input)
-        mha_input = feat.view(x.size(0), x.size(1), -1)
-        lstm_input = feat
-        output = feat
+        feat = feat.view(x.size(0), x.size(1), -1)
+
+        last_feat = feat[:, -1]
+        lstm_input = last_feat
 
         if self.is_mha:
+            mha_input = feat
             lstm_input = attention_block(mha_input, self.posenc, self.mha)
 
         if self.is_lstm:
             self.h_t1, self.c_t1 = self.lstm(lstm_input, (self.h_t1, self.c_t1))    # h_t1 is the output
-            output = self.h_t1                                                      # [:, -1, :] .reshape(-1)
+            return self.h_t1                                                      # [:, -1, :] .reshape(-1)
 
-        return output
+        return last_feat
 
 
 class A2CNet(nn.Module):
