@@ -96,6 +96,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._w3Param = 0
     self._w4Param = 0
     self._w5Param = 0
+    self._w6Param = 0
     self._velocityParam = 5
 
   def reset(self):
@@ -106,6 +107,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._w3Param = 0
     self._w4Param = 0
     self._w5Param = 0
+    self._w6Param = 1
     self._velocityParam = 5
 
     self._p.resetSimulation()
@@ -173,7 +175,8 @@ class RacecarZEDGymEnv(gym.Env):
     self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 0)
     self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 10, 0)
     self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 10, 0)
-    self.slider_id6 = self._p.addUserDebugParameter("velocity (moving obj)", 0, 10, 5)
+    self.slider_id6 = self._p.addUserDebugParameter("tau (w6)", 0, 10, 0)
+    self.slider_vel = self._p.addUserDebugParameter("velocity (moving obj)", 0, 10, 5)
 
   def updateDebug(self):
     """called in step function"""
@@ -188,7 +191,8 @@ class RacecarZEDGymEnv(gym.Env):
     self._w3Param = self._p.readUserDebugParameter(self.slider_id3)
     self._w4Param = self._p.readUserDebugParameter(self.slider_id4)
     self._w5Param = self._p.readUserDebugParameter(self.slider_id5)
-    self._velocityParam = self._p.readUserDebugParameter(self.slider_id6)
+    self._w6Param = self._p.readUserDebugParameter(self.slider_id6)
+    self._velocityParam = self._p.readUserDebugParameter(self.slider_vel)
 
   def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
@@ -366,6 +370,7 @@ class RacecarZEDGymEnv(gym.Env):
     gamma = 0       # discrete reward: stopping at traffic lights (linear)
     delta = 0       # discrete reward: avoiding stationary objects (exp)
     epsilon = 0     # discrete reward: avoiding moving objects (exp)
+    tau = 0         # discrete reward: elapsed time in the episode (hyperbola)
 
     # weights for the different rewards, these should be tuned via sliders
     w0 = self._w0Param
@@ -374,9 +379,7 @@ class RacecarZEDGymEnv(gym.Env):
     w3 = self._w3Param
     w4 = self._w4Param
     w5 = self._w5Param
-
-    """timing should be tau -> end of the episode
-    if got there: positive reward and new finish line"""
+    w6 = self._w6Param
 
     # get car positions
     car_pos, car_orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
@@ -405,7 +408,6 @@ class RacecarZEDGymEnv(gym.Env):
         beta = -100                         # huge error
     else:
         beta = m.log_prob(x).item()         # = ln(Normal) -> returns tensor
-
 
     # gamma
     tLight_pos = self._mapObjects["aws_robomaker_racetrack_RaceStartLight_01_00"]["pose_xyz"]
@@ -451,8 +453,16 @@ class RacecarZEDGymEnv(gym.Env):
     else:
         epsilon = 0
 
+    # Tau
+    if self._termination():  # car could not reach the finish line before the end of the episode
+        tau = -100
+
+    if car_fin_dist < 0.1:  # car has reached finish line -> reset
+        tau = self._terminationNum / self._envStepCounter
+        self._envStepCounter = self._terminationNum + 1     # triggering reset
+
     # calculating the reward
-    reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon)
+    reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon + w6*tau)
     print("reward:", reward)
     return reward
 
