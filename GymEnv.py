@@ -175,7 +175,7 @@ class RacecarZEDGymEnv(gym.Env):
     self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 0)
     self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 10, 0)
     self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 10, 0)
-    self.slider_id6 = self._p.addUserDebugParameter("tau (w6)", 0, 10, 0)
+    self.slider_id6 = self._p.addUserDebugParameter("tau (w6)", 0, 10, 1)
     self.slider_vel = self._p.addUserDebugParameter("velocity (moving obj)", 0, 10, 5)
 
   def updateDebug(self):
@@ -364,7 +364,7 @@ class RacecarZEDGymEnv(gym.Env):
       return state
 
   def _reward(self):
-    # initial reward
+    # initialize rewards
     alpha = 0       # continuous reward: distance from the finish line (linear)
     beta = 0        # continuous reward: positon in a lane (gauss -> parabola)
     gamma = 0       # discrete reward: stopping at traffic lights (linear)
@@ -403,11 +403,15 @@ class RacecarZEDGymEnv(gym.Env):
     distBetweenLanes = 1.2                  # hard coded
     mu = distBetweenLanes/2.0               # shifted to the middle of the track
     sig = mu/3.0                            # 3 sigma -> 99.7%
-    m = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
+    gauss_lane = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
+    gauss_opp_lane = N.Normal(torch.tensor([-2*mu]), torch.tensor([sig]))
+
     if (x >= 1.2) or (x <= -1.2):           # off-road
         beta = -100                         # huge error
+    elif x > -mu:
+        beta = math.exp(gauss_lane.log_prob(torch.tensor([x])).item())  # = exp(ln(Normal)) -> returns tensor
     else:
-        beta = m.log_prob(x).item()         # = ln(Normal) -> returns tensor
+        beta = -math.exp(gauss_opp_lane.log_prob(torch.tensor([x])).item())
 
     # gamma
     tLight_pos = self._mapObjects["aws_robomaker_racetrack_RaceStartLight_01_00"]["pose_xyz"]
@@ -439,7 +443,7 @@ class RacecarZEDGymEnv(gym.Env):
                 nearest = car_sObj_dist
 
         if nearest < 1:
-            delta = - math.exp(-(nearest**2))
+            delta = -math.exp(-7*(nearest**2))
         else:
             delta = 0
 
@@ -448,10 +452,7 @@ class RacecarZEDGymEnv(gym.Env):
                                              self._movingObjectUniqueId,
                                              10000)  # this is the max allowed distance
     if car_mObj_dist[0][8] < 1:
-        m = N.Normal(torch.tensor([0.0]), torch.tensor([w5]))  # sigma=1/w5 -> no huge step between the values at x=1
-        epsilon = 1 / m.log_prob(car_mObj_dist[0][8]).item()
-    else:
-        epsilon = 0
+        epsilon = -math.exp(-7*(car_mObj_dist[0][8]**2))
 
     # Tau
     if self._termination():  # car could not reach the finish line before the end of the episode
