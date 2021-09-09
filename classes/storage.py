@@ -194,7 +194,7 @@ class RolloutStorage(object):
             self.writer.add_scalar("policy_loss", policy_loss.item())
             self.writer.add_scalar("value_loss", value_loss.item())
             self.writer.add_histogram("advantage", advantage.detach())
-            self.writer.add_histogram("rewards", rewards.detach())
+            self.writer.add_histogram("discounted_rewards", rewards.detach())
             self.writer.add_histogram("action_prob", self.log_probs.detach())
 
         return loss

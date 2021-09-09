@@ -75,6 +75,7 @@ class Runner(object):
             nn.utils.clip_grad_norm_(self.net.parameters(), self.max_grad_norm)
 
             if self.writer is not None:
+                self.writer.add_scalar("roll_out_rewards", mean_reward.item())
                 self.writer.add_scalar("loss", loss.item())
 
             self.net.optimizer.step()
@@ -124,7 +125,8 @@ class Runner(object):
                 print("---------------------------new episode---------------------------")
 
         episode_reward /= self.rollout_size
-        episode_reward = max(episode_reward)
+        episode_reward = max(episode_reward)        # best of all the environments
+
         # Note:
         # get the estimate of the final reward
         # that's why we have the CRITIC --> estimate final reward
