@@ -54,6 +54,23 @@ class Runner(object):
 
         # self.writer.add_graph(self.net, input_to_model=(self.storage.states[0],)) --> not working for LSTMCEll
 
+        # right = 6, forward = 7, left = 8, reverse = 1
+        turn = 5
+        first_section = 40
+        pass_section = 10
+        last_section = 200
+        self.action_list = []
+        self.action_list = self.action_list + [7, ] * first_section
+        self.action_list = self.action_list + [6, ] * turn
+        self.action_list = self.action_list + [7, ] * pass_section
+        self.action_list = self.action_list + [8, ] * turn
+        self.action_list = self.action_list + [7, ] * pass_section
+        self.action_list = self.action_list + [8, ] * turn
+        self.action_list = self.action_list + [7, ] * pass_section
+        self.action_list = self.action_list + [6, ] * turn
+        self.action_list = self.action_list + [7, ] * last_section
+        self.action_num = 0
+
     def train(self):
 
         """Environment reset"""
@@ -111,8 +128,12 @@ class Runner(object):
             # accumulate episode entropy
             episode_entropy += entropy
 
+            # test
+            a_t = torch.tensor([self.action_list[self.action_num]])
+            self.action_num = self.action_num + 1
+
             # interact
-            obs, rewards, dones, infos = self.env.step(a_t.cpu().numpy())
+            obs, rewards, dones, infos = self.env.step(a_t.numpy())   # .cpu()
             episode_reward += rewards
 
             # save episode reward

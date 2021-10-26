@@ -114,8 +114,6 @@ class RacecarZEDGymEnv(gym.Env):
     self.numStuck = 0
 
   def reset(self):
-    self.steerStorage = []
-    self.forwardStorage = []
     self._firstAlpha = True
     self._w0Param = 1
     self._w1Param = 30
@@ -278,10 +276,6 @@ class RacecarZEDGymEnv(gym.Env):
       steerings = [-0.6, 0, 0.6, -0.6, 0, 0.6, -0.6, 0, 0.6]
       forward = fwd[action]
       steer = steerings[action]
-
-      self.forwardStorage.append(forward)
-      self.steerStorage.append(steer)
-
       realaction = [forward, steer]
     else:
       realaction = action
@@ -300,9 +294,6 @@ class RacecarZEDGymEnv(gym.Env):
 
       self._observation = self.getExtendedObservation()
       observations.append(np.array(self._observation))
-
-      # cv2.putText(self._observation, f"{forward}", (10, 80), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 4, cv2.LINE_AA)
-      # cv2.putText(self._observation, f"{steer}", (60, 80), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 4, cv2.LINE_AA)
 
       if self._termination():
         recounted = Counter(self.steerStorage)
