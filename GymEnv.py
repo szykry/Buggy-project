@@ -16,6 +16,10 @@ from . import racecar
 import random
 import pybullet_data
 from pkg_resources import parse_version
+from collections import Counter
+
+import matplotlib.pyplot as plt
+import  cv2
 
 import torch
 import torch.distributions.normal as N
@@ -52,7 +56,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._prevState = "red"
     self._direction = 1                 # direction of moving object
     self._mObjposA = [4, -14.1, 0.9]    # moving object strolls between these positions
-    self._mObjposB = [4, -15.8, 0.9]
+    self._mObjposB = [4, -15.8, 0.9]   # 4
     self.randomMap = True
     self.follow_car = 0
 
@@ -60,6 +64,8 @@ class RacecarZEDGymEnv(gym.Env):
       self._p = bc.BulletClient(connection_mode=pybullet.GUI)
     else:
       self._p = bc.BulletClient()
+
+    self._p.configureDebugVisualizer(self._p.COV_ENABLE_RENDERING, 0)
 
     # objects
     self._finishLineUniqueId = None
@@ -90,16 +96,21 @@ class RacecarZEDGymEnv(gym.Env):
                                         dtype=np.uint8)
 
     self.viewer = None
-    self._w0Param = 1
-    self._w1Param = 30
+    self._w0Param = 0
+    self._w1Param = 0
     self._w2Param = 0
     self._w3Param = 0
     self._w4Param = 0
     self._w5Param = 0
     self._w6Param = 0
-    self._velocityParam = 5
+    self._velocityParam = 0
+    self.steerStorage = []
+    self.forwardStorage = []
+    self.numStuck = 0
 
   def reset(self):
+    self.steerStorage = []
+    self.forwardStorage = []
     self._firstAlpha = True
     self._w0Param = 1
     self._w1Param = 30
@@ -110,16 +121,22 @@ class RacecarZEDGymEnv(gym.Env):
     self._w6Param = 1
     self._velocityParam = 5
 
+    self.numStuck = 0
+
     self._p.resetSimulation()
     #p.setPhysicsEngineParameter(numSolverIterations=300)
     self._p.setTimeStep(self._timeStep)
     self._p.setGravity(0, 0, -9.8)                  # 9.8 in minus Z direction
 
     # load the map
-    self._mapObjects = gazebo_world_parser.parseWorld(self._p, filepath=os.path.join(self._urdfRoot, "OBJs/gazebo/worlds/racetrack_day.world"))
+    self._p.configureDebugVisualizer(self._p.COV_ENABLE_RENDERING, 0)
+    my_world = "c:/Krisz/BME/MSc/Semester 1/Önlab 1/buggy/assets/gazebo/worlds/racetrack_day.world"
+    other_world = os.path.join(self._urdfRoot, "OBJs/gazebo/worlds/racetrack_day.world")
+    self._mapObjects = gazebo_world_parser.parseWorld(self._p, filepath=my_world)
 
     # set finish line
     self._finishLineUniqueId = 5     # aws_robomaker_racetrack_Billboard_01 (hard coded)
+    self._p.getVisualShapeData(self._finishLineUniqueId)
 
     # select _stationaryObjects objects
     for k, v in self._mapObjects.items():  # nested dict
@@ -139,6 +156,8 @@ class RacecarZEDGymEnv(gym.Env):
     # load the racecar
     self._racecar = racecar.Racecar(self._p, urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
     pos, orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
+
+    self._p.configureDebugVisualizer(self._p.COV_ENABLE_RENDERING, 1)
 
     if self.randomMap:
         newX = -10 + 4. * random.random()
@@ -171,7 +190,7 @@ class RacecarZEDGymEnv(gym.Env):
     # add slider
     self.slider_id0 = self._p.addUserDebugParameter("reward (w0)", 0, 10, 1)
     self.slider_id1 = self._p.addUserDebugParameter("alpha (w1)", 0, 100, 30)
-    self.slider_id2 = self._p.addUserDebugParameter("beta (w2)", 0, 10, 0)
+    self.slider_id2 = self._p.addUserDebugParameter("beta (w2)", 0, 10, 1)
     self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 0)
     self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 10, 0)
     self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 10, 0)
@@ -248,6 +267,10 @@ class RacecarZEDGymEnv(gym.Env):
       steerings = [-0.6, 0, 0.6, -0.6, 0, 0.6, -0.6, 0, 0.6]
       forward = fwd[action]
       steer = steerings[action]
+
+      self.forwardStorage.append(forward)
+      self.steerStorage.append(steer)
+
       realaction = [forward, steer]
     else:
       realaction = action
@@ -267,7 +290,13 @@ class RacecarZEDGymEnv(gym.Env):
       self._observation = self.getExtendedObservation()
       observations.append(np.array(self._observation))
 
+      # cv2.putText(self._observation, f"{forward}", (10, 80), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 4, cv2.LINE_AA)
+      # cv2.putText(self._observation, f"{steer}", (60, 80), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 4, cv2.LINE_AA)
+
       if self._termination():
+        recounted = Counter(self.steerStorage)
+        for k in sorted(recounted):
+          print(f"{k} {'+' * recounted[k]}")
         break
 
       self._envStepCounter += 1
@@ -461,6 +490,18 @@ class RacecarZEDGymEnv(gym.Env):
     if car_fin_dist < 0.1:  # car has reached finish line -> reset
         tau = self._terminationNum / self._envStepCounter
         self._envStepCounter = self._terminationNum + 1     # triggering reset
+        print("tau:", tau)
+
+
+    # if the car is stucked for 10 roll out, start new episode and get huge penalty
+    if abs(alpha) < 0.01:
+        self.numStuck += 1
+        if self.numStuck == 10:
+            self._envStepCounter = self._terminationNum + 1  # triggering reset
+            alpha = -10
+            print("Stucked")
+    else:
+        self.numStuck = 0   # reset stucked roll out counter
 
     # calculating the reward
     reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon + w6*tau)

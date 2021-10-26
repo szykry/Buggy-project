@@ -269,5 +269,8 @@ class A2CNet(nn.Module):
         cat = Categorical(action_prob)
         action = cat.sample()
 
+        if self.writer is not None:
+            self.writer.add_histogram("action", action.detach())
+
         return (action, cat.log_prob(action), cat.entropy().mean(), value,
                 feature)
