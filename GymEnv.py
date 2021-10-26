@@ -104,8 +104,13 @@ class RacecarZEDGymEnv(gym.Env):
     self._w5Param = 0
     self._w6Param = 0
     self._velocityParam = 0
-    self.steerStorage = []
-    self.forwardStorage = []
+    self.rewards = []
+    self.alphas = []
+    self.betas = []
+    self.gammas = []
+    self.deltas = []
+    self.epsilons = []
+    self.taus = []
     self.numStuck = 0
 
   def reset(self):
@@ -114,13 +119,19 @@ class RacecarZEDGymEnv(gym.Env):
     self._firstAlpha = True
     self._w0Param = 1
     self._w1Param = 30
-    self._w2Param = 0
-    self._w3Param = 0
-    self._w4Param = 0
-    self._w5Param = 0
+    self._w2Param = 1
+    self._w3Param = 1
+    self._w4Param = 1
+    self._w5Param = 1
     self._w6Param = 1
     self._velocityParam = 5
-
+    self.rewards = []
+    self.alphas = []
+    self.betas = []
+    self.gammas = []
+    self.deltas = []
+    self.epsilons = []
+    self.taus = []
     self.numStuck = 0
 
     self._p.resetSimulation()
@@ -161,10 +172,10 @@ class RacecarZEDGymEnv(gym.Env):
 
     if self.randomMap:
         newX = -10 + 4. * random.random()
-        newY = -15.5
+        newY = -15.6
     else:
         newX = -10
-        newY = -15.5
+        newY = -15.6
 
     newZ = pos[2]
     self._p.resetBasePositionAndOrientation(self._racecar.racecarUniqueId, [newX, newY, newZ], orn)
@@ -191,9 +202,9 @@ class RacecarZEDGymEnv(gym.Env):
     self.slider_id0 = self._p.addUserDebugParameter("reward (w0)", 0, 10, 1)
     self.slider_id1 = self._p.addUserDebugParameter("alpha (w1)", 0, 100, 30)
     self.slider_id2 = self._p.addUserDebugParameter("beta (w2)", 0, 10, 1)
-    self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 0)
-    self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 10, 0)
-    self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 10, 0)
+    self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 1)
+    self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 10, 1)
+    self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 10, 1)
     self.slider_id6 = self._p.addUserDebugParameter("tau (w6)", 0, 10, 1)
     self.slider_vel = self._p.addUserDebugParameter("velocity (moving obj)", 0, 10, 5)
 
@@ -392,7 +403,155 @@ class RacecarZEDGymEnv(gym.Env):
 
       return state
 
-  def _reward(self):
+  def _drawReward(self, reward, alpha, beta, gamma, delta, epsilon, tau):
+      self.rewards.append(reward)
+      self.alphas.append(alpha)
+      self.betas.append(beta)
+      self.gammas.append(gamma)
+      self.deltas.append(delta)
+      self.epsilons.append(epsilon)
+      self.taus.append(tau)
+
+      fig = plt.gcf()
+      fig.set_size_inches(18.5, 10.5)
+      t = np.linspace(0, len(self.rewards) - 1, len(self.rewards))
+
+      p1 = plt.subplot(711)
+      p1.set_title('Rewards')
+      line1, = p1.plot(t, self.alphas, 'r')
+      plt.legend((line1,), ('Alpha',))
+
+      p2 = plt.subplot(712)
+      line2, = p2.plot(t, self.betas, 'b')
+      plt.legend((line2,), ('Beta',))
+
+      p3 = plt.subplot(713)
+      line3, = p3.plot(t, self.gammas, 'g')
+      plt.legend((line3,), ('Gamma',))
+
+      p4 = plt.subplot(714)
+      line4, = p4.plot(t, self.deltas, 'g')
+      plt.legend((line4,), ('Delta',))
+
+      p5 = plt.subplot(715)
+      line5, = p5.plot(t, self.epsilons, 'r')
+      plt.legend((line5,), ('Epsilon',))
+
+      p6 = plt.subplot(716)
+      line6, = p6.plot(t, self.taus, 'b')
+      plt.legend((line6,), ('Tau',))
+
+      p7 = plt.subplot(717)
+      line7, = p7.plot(t, self.rewards, 'r')
+      plt.legend((line7,), ('Reward',))
+
+      plt.savefig('rewards.png', dpi=100)
+      fig.show()
+      fig.canvas.draw()
+
+  def _alpha(self, car_fin_dist):
+      if self._firstAlpha:
+          self._prev_distance = car_fin_dist  # fixing the huge error in the first step
+          self._firstAlpha = False
+
+      alpha = -(car_fin_dist - self._prev_distance)  # distance difference
+      self._prev_distance = car_fin_dist
+
+      # if the car is stucked for 10 roll out, start new episode and get huge penalty
+      if abs(alpha) < 0.01:
+          self.numStuck += 1
+          if self.numStuck == 10:
+              self._envStepCounter = self._terminationNum + 1  # triggering reset
+              alpha = -10
+              print("Stucked")
+      else:
+          self.numStuck = 0  # reset stucked roll out counter
+
+      return alpha
+
+  def _beta(self, car_pos):
+      center = self._mapObjects["aws_robomaker_racetrack_Trackline_01"]["pose_xyz"]
+      x = self._distanceFromTrafficLine(car_pos=car_pos,
+                                        center=center,
+                                        length=32,  # measured data
+                                        width=15,  # width should be the same as radius
+                                        radius=14.75)  # traffic line is the zero point
+      distBetweenLanes = 1.2  # hard coded
+      mu = distBetweenLanes / 2.0  # shifted to the middle of the track
+      sig = mu / 3.0  # 3 sigma -> 99.7%
+      gauss_lane = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
+      gauss_opp_lane = N.Normal(torch.tensor([-2 * mu]), torch.tensor([sig]))
+
+      if (x >= 1.2) or (x <= -1.2):  # off-road
+          beta = -100  # huge error
+      elif x > -mu:
+          beta = math.exp(gauss_lane.log_prob(torch.tensor([x])).item())  # = exp(ln(Normal)) -> returns tensor
+      else:
+          beta = -math.exp(gauss_opp_lane.log_prob(torch.tensor([x])).item())
+
+      return beta
+
+  def _gamma(self, car_pos):
+      tLight_pos = self._mapObjects["aws_robomaker_racetrack_RaceStartLight_01_00"]["pose_xyz"]
+      car_light_dist = self._distance2D(car_pos, tLight_pos)
+      velocity = self._p.getBaseVelocity(self._racecar.racecarUniqueId)
+      tLight = self._trafficLightStateMachine()
+
+      if tLight == "green":
+          gamma = 0
+      else:
+          if (car_light_dist > 0.5 and car_light_dist < 2):  # agent stops within 2 meters
+              velocity_vector = math.sqrt(velocity[0][0] ** 2 + velocity[0][1] ** 2)  # sqrt(vx^2 + vy^2)
+              gamma = -velocity_vector
+          elif (car_light_dist < 0.5):  # agent is too close
+              gamma = -100  # huge error
+          else:
+              gamma = 0
+
+      return gamma
+
+  def _delta(self, car_pos):
+      nearest = 1
+      sObj_pos = []
+
+      for i, k in enumerate(self._stationaryObjects.keys()):
+          sObj_pos.append(self._stationaryObjects[k]["pose_xyz"])
+          car_sObj_dist = self._distance3D(car_pos, sObj_pos[i])
+
+          if car_sObj_dist < nearest:
+              nearest = car_sObj_dist
+
+      if nearest < 1:
+          delta = -math.exp(-7 * (nearest ** 2))
+      else:
+          delta = 0
+
+      return delta
+
+  def _epsilon(self):
+      car_mObj_dist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
+                                               self._movingObjectUniqueId,
+                                               10000)  # this is the max allowed distance
+      if car_mObj_dist[0][8] < 1:
+          epsilon = -math.exp(-7 * (car_mObj_dist[0][8] ** 2))
+      else:
+          epsilon = 0
+
+      return epsilon
+
+  def _tau(self, car_fin_dist):
+      if self._termination():  # car could not reach the finish line before the end of the episode
+          return -100
+
+      elif car_fin_dist < 0.3:  # car has reached finish line -> reset
+          tau = self._terminationNum / self._envStepCounter
+          self._envStepCounter = self._terminationNum + 1  # TODO: triggering reset
+          print("tau:", tau)
+          return tau
+
+      return 0
+
+  def _reward(self, realaction):
     # initialize rewards
     alpha = 0       # continuous reward: distance from the finish line (linear)
     beta = 0        # continuous reward: positon in a lane (gauss -> parabola)
@@ -410,102 +569,23 @@ class RacecarZEDGymEnv(gym.Env):
     w5 = self._w5Param
     w6 = self._w6Param
 
-    # get car positions
+    # get car position informations
     car_pos, car_orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
-
-    # alpha
     finish_pos, finish_orn = self._p.getBasePositionAndOrientation(self._finishLineUniqueId)
     car_fin_dist = self._distance2D(car_pos, finish_pos)
-    if self._firstAlpha:
-        self._prev_distance = car_fin_dist             # fixing the huge error in the first step
-        self._firstAlpha = False
-    alpha = -(car_fin_dist - self._prev_distance)      # distance difference
-    self._prev_distance = car_fin_dist
 
-    # beta
-    center = self._mapObjects["aws_robomaker_racetrack_Trackline_01"]["pose_xyz"]
-    x = self._distanceFromTrafficLine(car_pos=car_pos,
-                                      center=center,
-                                      length=32,        # measured data
-                                      width=15,         # width should be the same as radius
-                                      radius=14.75)     # traffic line is the zero point
-    distBetweenLanes = 1.2                  # hard coded
-    mu = distBetweenLanes/2.0               # shifted to the middle of the track
-    sig = mu/3.0                            # 3 sigma -> 99.7%
-    gauss_lane = N.Normal(torch.tensor([mu]), torch.tensor([sig]))
-    gauss_opp_lane = N.Normal(torch.tensor([-2*mu]), torch.tensor([sig]))
+    # compute rewards
+    alpha = self._alpha(car_fin_dist)
+    beta = self._beta(car_pos)
+    gamma = self._gamma(car_pos)
+    delta = self._delta(car_pos)
+    epsilon = self._epsilon()
+    tau = self._tau(car_fin_dist)
 
-    if (x >= 1.2) or (x <= -1.2):           # off-road
-        beta = -100                         # huge error
-    elif x > -mu:
-        beta = math.exp(gauss_lane.log_prob(torch.tensor([x])).item())  # = exp(ln(Normal)) -> returns tensor
-    else:
-        beta = -math.exp(gauss_opp_lane.log_prob(torch.tensor([x])).item())
-
-    # gamma
-    tLight_pos = self._mapObjects["aws_robomaker_racetrack_RaceStartLight_01_00"]["pose_xyz"]
-    car_light_dist = self._distance2D(car_pos, tLight_pos)
-    velocity = self._p.getBaseVelocity(self._racecar.racecarUniqueId)
-    tLight = self._trafficLightStateMachine()
-
-    if tLight == "green":
-      gamma = 0
-    else:
-        if (car_light_dist > 0.5 and car_light_dist < 2):                           # agent stops within 2 meters
-            velocity_vector = math.sqrt(velocity[0][0] ** 2 + velocity[0][1] ** 2)  # sqrt(vx^2 + vy^2)
-            gamma = -velocity_vector
-        elif (car_light_dist < 0.5):                # agent is too close
-            gamma = -100                            # huge error
-        else:
-            gamma = 0
-
-    # delta
-    if False:
-        nearest = 1
-        sObj_pos = []
-
-        for i, k in enumerate(self._stationaryObjects.keys()):
-            sObj_pos.append(self._stationaryObjects[k]["pose_xyz"])
-            car_sObj_dist = self._distance3D(car_pos, sObj_pos[i])
-
-            if car_sObj_dist < nearest:
-                nearest = car_sObj_dist
-
-        if nearest < 1:
-            delta = -math.exp(-7*(nearest**2))
-        else:
-            delta = 0
-
-    # epsilon
-    car_mObj_dist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
-                                             self._movingObjectUniqueId,
-                                             10000)  # this is the max allowed distance
-    if car_mObj_dist[0][8] < 1:
-        epsilon = -math.exp(-7*(car_mObj_dist[0][8]**2))
-
-    # Tau
-    if self._termination():  # car could not reach the finish line before the end of the episode
-        tau = -100
-
-    if car_fin_dist < 0.1:  # car has reached finish line -> reset
-        tau = self._terminationNum / self._envStepCounter
-        self._envStepCounter = self._terminationNum + 1     # triggering reset
-        print("tau:", tau)
-
-
-    # if the car is stucked for 10 roll out, start new episode and get huge penalty
-    if abs(alpha) < 0.01:
-        self.numStuck += 1
-        if self.numStuck == 10:
-            self._envStepCounter = self._terminationNum + 1  # triggering reset
-            alpha = -10
-            print("Stucked")
-    else:
-        self.numStuck = 0   # reset stucked roll out counter
-
-    # calculating the reward
     reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon + w6*tau)
-    print("reward:", reward)
+
+    self._drawReward(reward, w1*alpha, w2*beta, w3*gamma, w4*delta, w5*epsilon, w6*tau)
+
     return reward
 
   if parse_version(gym.__version__) < parse_version('0.9.6'):
