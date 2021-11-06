@@ -114,6 +114,8 @@ class RacecarZEDGymEnv(gym.Env):
 
   def reset(self):
     self._firstAlpha = True
+    self._firstDelta = True
+    self._firstEps = True
     self._w0Param = 1
     self._w1Param = 30
     self._w2Param = 1
@@ -360,6 +362,9 @@ class RacecarZEDGymEnv(gym.Env):
   def _distance3D(self, posA, posB):
       return math.sqrt((posA[0]-posB[0])**2 + (posA[1]-posB[1])**2 + (posA[2]-posB[2])**2)
 
+  def _angle2D(self, posA, posB):
+      return math.atan((posB[1]-posA[1]) / (posB[0]-posA[0]))
+
   def _distanceFromTrafficLine(self, car_pos, center, length, width, radius):
       UpperX = center[0] + length/2
       BottomX = center[0] - length/2
@@ -496,30 +501,63 @@ class RacecarZEDGymEnv(gym.Env):
 
       return gamma
 
-  def _delta(self, car_pos):
-      nearest = 1
+  def _delta(self, car_pos, yaw):
+      nearest = 10
+      angle = 0
       sObj_pos = []
 
+      # calculating distances between the car and objects
       for i, k in enumerate(self._stationaryObjects.keys()):
           sObj_pos.append(self._stationaryObjects[k]["pose_xyz"])
           car_sObj_dist = self._distance3D(car_pos, sObj_pos[i])
 
           if car_sObj_dist < nearest:
               nearest = car_sObj_dist
+              angle = self._angle2D(car_pos, sObj_pos[i])
 
-      if nearest < 1:
+      inRange = nearest < 1
+
+      # computing if the nearest object is in the field of view (30°)
+      inView = abs(yaw - angle) <= math.pi / 6
+
+      # checking if the car is heading towards the nearest object
+      if self._firstDelta:
+          self._prevDistanceFromNearest = car_sObj_dist
+          self._firstDelta = False
+
+      gettingCloser = (car_sObj_dist / self._prevDistanceFromNearest) < 1
+      self._prevDistanceFromNearest = car_sObj_dist
+
+      # computing delta
+      if inRange and inView and gettingCloser:
           delta = -math.exp(-7 * (nearest ** 2))
       else:
           delta = 0
 
       return delta
 
-  def _epsilon(self):
-      car_mObj_dist = self._p.getClosestPoints(self._racecar.racecarUniqueId,
+  def _epsilon(self, yaw):
+      closestPoints = self._p.getClosestPoints(self._racecar.racecarUniqueId,
                                                self._movingObjectUniqueId,
                                                10000)  # this is the max allowed distance
-      if car_mObj_dist[0][8] < 1:
-          epsilon = -math.exp(-7 * (car_mObj_dist[0][8] ** 2))
+      car_mObj_dist = closestPoints[0][8]   # base-to-base
+      inRange = car_mObj_dist < 1
+
+      # computing if the moving object is in the field of view (30°)
+      angle = self._angle2D(closestPoints[0][5], closestPoints[0][6])
+      inView = abs(yaw - angle) <= math.pi / 6
+
+      # checking if the car is heading towards the moving object
+      if self._firstEps:
+          self._prevDistanceFromMoving = car_mObj_dist
+          self._firstEps = False
+
+      gettingCloser = (car_mObj_dist / self._prevDistanceFromMoving) < 1
+      self._prevDistanceFromMoving = car_mObj_dist
+
+      # computing epsilon
+      if inRange and inView and gettingCloser:
+          epsilon = -math.exp(-7 * (car_mObj_dist ** 2))
       else:
           epsilon = 0
 
@@ -557,6 +595,7 @@ class RacecarZEDGymEnv(gym.Env):
 
     # get car position informations
     car_pos, car_orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
+    _, _, yaw = self._p.getEulerFromQuaternion(car_orn)
     finish_pos, finish_orn = self._p.getBasePositionAndOrientation(self._finishLineUniqueId)
     car_fin_dist = self._distance2D(car_pos, finish_pos)
 
@@ -564,8 +603,8 @@ class RacecarZEDGymEnv(gym.Env):
     alpha = self._alpha(car_fin_dist)
     beta = self._beta(car_pos)
     gamma = self._gamma(car_pos)
-    delta = self._delta(car_pos)
-    epsilon = self._epsilon()
+    delta = self._delta(car_pos, yaw)
+    epsilon = self._epsilon(yaw)
     tau = self._tau(car_fin_dist)
 
     reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon + w6*tau)
