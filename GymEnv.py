@@ -10,7 +10,7 @@ from gym.utils import seeding
 import numpy as np
 import time
 import pybullet
-import pybullet_utils.bullet_client as bc
+from pybullet_utils import bullet_client as bc
 from pybullet_utils import gazebo_world_parser
 from . import racecar
 import random
@@ -52,7 +52,6 @@ class RacecarZEDGymEnv(gym.Env):
     self._cam_pitch = -35
     self._width = 128     # 640 -> camera width
     self._height = 128    # 480 -> camera height
-    self._prev_distance = 0
     self._prevState = "red"
     self._direction = 1                 # direction of moving object
     self._mObjposA = [4, -14.1, 0.9]    # moving object strolls between these positions
@@ -296,11 +295,7 @@ class RacecarZEDGymEnv(gym.Env):
       observations.append(np.array(self._observation))
 
       if self._termination():
-        recounted = Counter(self.steerStorage)
-        for k in sorted(recounted):
-          print(f"{k} {'+' * recounted[k]}")
         break
-
       self._envStepCounter += 1
 
     reward = self._reward()
@@ -348,16 +343,12 @@ class RacecarZEDGymEnv(gym.Env):
       return
 
   def _movingObject(self, objId, toPos, eps):
-      obj_pos, _ = self._p.getBasePositionAndOrientation(objId)
-      d = self._distance2D(obj_pos, toPos)  # only 2D
-      dir = self._direction
-      amp = self._velocityParam
-      self._p.resetBaseVelocity(objId, [0, -amp*dir, 0])
+      self._p.resetBaseVelocity(objId, [0, -self._velocityParam * self._direction, 0])
 
-      if d < eps:   # object arrived
+      obj_pos, _ = self._p.getBasePositionAndOrientation(objId)
+      if self._distance2D(obj_pos, toPos) < eps:   # object has arrived
           return True
-      else:
-          return False
+      return False
 
   def _distance2D(self, posA, posB):
       return math.sqrt((posA[0]-posB[0])**2 + (posA[1]-posB[1])**2)
@@ -442,11 +433,11 @@ class RacecarZEDGymEnv(gym.Env):
 
   def _alpha(self, car_fin_dist):
       if self._firstAlpha:
-          self._prev_distance = car_fin_dist  # fixing the huge error in the first step
+          self._prevDistanceFromFinish = car_fin_dist  # fixing the huge error in the first step
           self._firstAlpha = False
 
-      alpha = -(car_fin_dist - self._prev_distance)  # distance difference
-      self._prev_distance = car_fin_dist
+      alpha = -(car_fin_dist - self._prevDistanceFromFinish)  # distance difference
+      self._prevDistanceFromFinish = car_fin_dist
 
       # if the car is stucked for 10 roll out, start new episode and get huge penalty
       if abs(alpha) < 0.01:
