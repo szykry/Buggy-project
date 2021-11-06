@@ -118,9 +118,9 @@ class RacecarZEDGymEnv(gym.Env):
     self._w0Param = 1
     self._w1Param = 30
     self._w2Param = 1
-    self._w3Param = 1
-    self._w4Param = 1
-    self._w5Param = 1
+    self._w3Param = 10
+    self._w4Param = 100
+    self._w5Param = 10
     self._w6Param = 1
     self._velocityParam = 5
     self.rewards = []
@@ -200,9 +200,9 @@ class RacecarZEDGymEnv(gym.Env):
     self.slider_id0 = self._p.addUserDebugParameter("reward (w0)", 0, 10, 1)
     self.slider_id1 = self._p.addUserDebugParameter("alpha (w1)", 0, 100, 30)
     self.slider_id2 = self._p.addUserDebugParameter("beta (w2)", 0, 10, 1)
-    self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 1)
-    self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 10, 1)
-    self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 10, 1)
+    self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 10)
+    self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 100, 100)
+    self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 10, 10)
     self.slider_id6 = self._p.addUserDebugParameter("tau (w6)", 0, 10, 1)
     self.slider_vel = self._p.addUserDebugParameter("velocity (moving obj)", 0, 10, 5)
 
