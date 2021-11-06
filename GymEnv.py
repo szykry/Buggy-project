@@ -239,11 +239,13 @@ class RacecarZEDGymEnv(gym.Env):
     dist0 = 0.3
     dist1 = 1.
     eyePos = [
-        carpos[0] + dist0 * carmat[0], carpos[1] + dist0 * carmat[3],
+        carpos[0] + dist0 * carmat[0],
+        carpos[1] + dist0 * carmat[3],
         carpos[2] + dist0 * carmat[6] + 0.3
     ]
     targetPos = [
-        carpos[0] + dist1 * carmat[0], carpos[1] + dist1 * carmat[3],
+        carpos[0] + dist1 * carmat[0],
+        carpos[1] + dist1 * carmat[3],
         carpos[2] + dist1 * carmat[6] + 0.3
     ]
     up = [carmat[2], carmat[5], carmat[8]]
@@ -258,8 +260,10 @@ class RacecarZEDGymEnv(gym.Env):
     img_arr = self._p.getCameraImage(width=self._width,
                                      height=self._height,
                                      viewMatrix=viewMat,
-                                     projectionMatrix=projMatrix)
-
+                                     projectionMatrix=projMatrix,
+                                     renderer=pybullet.ER_BULLET_HARDWARE_OPENGL
+                                     # flags=pybullet.ER_NO_SEGMENTATION_MASK
+                                     )
     rgb = img_arr[2]
     np_img_arr = np.reshape(rgb, (self._height, self._width, 4))
     self._observation = np_img_arr
@@ -566,8 +570,7 @@ class RacecarZEDGymEnv(gym.Env):
 
     reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon + w6*tau)
 
-    self._drawReward(reward, w1*alpha, w2*beta, w3*gamma, w4*delta, w5*epsilon, w6*tau)
-
+    # self._drawReward(reward, w1*alpha, w2*beta, w3*gamma, w4*delta, w5*epsilon, w6*tau)
     return reward
 
   if parse_version(gym.__version__) < parse_version('0.9.6'):
