@@ -21,7 +21,8 @@ def main():
     env = SubprocVecEnv([make_env(render=args.render, rank=i, action_repeat=args.n_stack) for i in range(args.num_envs)])
 
     """Agent"""
-    agent = ICMAgent(4, args.num_envs, env.action_space.n, lr=args.lr, action_repeat=args.n_stack, is_mha=args.attention, is_lstm=args.lstm)
+    agent = ICMAgent(in_channel=4, num_envs=args.num_envs, num_actions=env.action_space.n, lr=args.lr,
+                     action_repeat=args.n_stack, is_mha=args.attention, is_lstm=args.lstm)
 
     """Train"""
     runner = Runner(agent, env, args.num_envs, args.n_stack, args.rollout_size, args.num_updates,

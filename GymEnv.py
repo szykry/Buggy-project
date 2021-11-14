@@ -110,9 +110,11 @@ class RacecarZEDGymEnv(gym.Env):
     self.deltas = []
     self.epsilons = []
     self.taus = []
-    self.numStuck = 0
+    self._numStuck = 0
 
   def reset(self):
+    print("reset")
+    self._numStuck = 0
     self._firstAlpha = True
     self._firstDelta = True
     self._firstEps = True
@@ -124,6 +126,8 @@ class RacecarZEDGymEnv(gym.Env):
     self._w5Param = 10
     self._w6Param = 1
     self._velocityParam = 5
+	
+	# Lists for plotting the rewards
     self.rewards = []
     self.alphas = []
     self.betas = []
@@ -131,10 +135,10 @@ class RacecarZEDGymEnv(gym.Env):
     self.deltas = []
     self.epsilons = []
     self.taus = []
-    self.numStuck = 0
 
+    # Reset the simulation
     self._p.resetSimulation()
-    #p.setPhysicsEngineParameter(numSolverIterations=300)
+    # p.setPhysicsEngineParameter(numSolverIterations=300)
     self._p.setTimeStep(self._timeStep)
     self._p.setGravity(0, 0, -9.8)                  # 9.8 in minus Z direction
 
@@ -307,7 +311,9 @@ class RacecarZEDGymEnv(gym.Env):
     reward = self._reward()
     done = self._termination()  # resets the environment
 
-    return observations, reward, done, {}
+    info = {"episode": {"r": reward, "a": realaction, "done": done}}
+
+    return observations, reward, done, info
 
   def render(self, mode='human', close=False):
     if mode != "rgb_array":
@@ -394,15 +400,7 @@ class RacecarZEDGymEnv(gym.Env):
 
       return state
 
-  def _drawReward(self, reward, alpha, beta, gamma, delta, epsilon, tau):
-      self.rewards.append(reward)
-      self.alphas.append(alpha)
-      self.betas.append(beta)
-      self.gammas.append(gamma)
-      self.deltas.append(delta)
-      self.epsilons.append(epsilon)
-      self.taus.append(tau)
-
+  def _drawReward(self):
       fig = plt.gcf()
       fig.set_size_inches(18.5, 10.5)
       t = np.linspace(0, len(self.rewards) - 1, len(self.rewards))
@@ -437,8 +435,6 @@ class RacecarZEDGymEnv(gym.Env):
       plt.legend((line7,), ('Reward',))
 
       plt.savefig('rewards.png', dpi=100)
-      fig.show()
-      fig.canvas.draw()
 
   def _alpha(self, car_fin_dist):
       if self._firstAlpha:
@@ -450,13 +446,13 @@ class RacecarZEDGymEnv(gym.Env):
 
       # if the car is stucked for 10 roll out, start new episode and get huge penalty
       if abs(alpha) < 0.01:
-          self.numStuck += 1
-          if self.numStuck == 10:
+          self._numStuck += 1
+          if self._numStuck == 10:
               self._envStepCounter = self._terminationNum + 1  # triggering reset
               alpha = -10
-              print("Stucked")
+              print("Stuck")
       else:
-          self.numStuck = 0  # reset stucked roll out counter
+          self._numStuck = 0  # reset stucked roll out counter
 
       return alpha
 
@@ -570,7 +566,8 @@ class RacecarZEDGymEnv(gym.Env):
       elif car_fin_dist < 0.3:  # car has reached finish line -> reset
           tau = self._terminationNum / self._envStepCounter
           self._envStepCounter = self._terminationNum + 1  # TODO: triggering reset
-          print("tau:", tau)
+          print("Finish!")
+          print("tau: ", tau)
           return tau
 
       return 0
@@ -578,10 +575,10 @@ class RacecarZEDGymEnv(gym.Env):
   def _reward(self, realaction):
     # initialize rewards
     alpha = 0       # continuous reward: distance from the finish line (linear)
-    beta = 0        # continuous reward: positon in a lane (gauss -> parabola)
+    beta = 0        # continuous reward: positon in a lane (gauss)
     gamma = 0       # discrete reward: stopping at traffic lights (linear)
-    delta = 0       # discrete reward: avoiding stationary objects (exp)
-    epsilon = 0     # discrete reward: avoiding moving objects (exp)
+    delta = 0       # discrete reward: avoiding stationary objects (gauss)
+    epsilon = 0     # discrete reward: avoiding moving objects (gauss)
     tau = 0         # discrete reward: elapsed time in the episode (hyperbola)
 
     # weights for the different rewards, these should be tuned via sliders
@@ -609,7 +606,17 @@ class RacecarZEDGymEnv(gym.Env):
 
     reward = w0*(w1*alpha + w2*beta + w3*gamma + w4*delta + w5*epsilon + w6*tau)
 
-    # self._drawReward(reward, w1*alpha, w2*beta, w3*gamma, w4*delta, w5*epsilon, w6*tau)
+    self.rewards.append(reward)
+    self.alphas.append(w1*alpha)
+    self.betas.append(w2*beta)
+    self.gammas.append(w3*gamma)
+    self.deltas.append(w4*delta)
+    self.epsilons.append(w5*epsilon)
+    self.taus.append(w6*tau)
+
+    if self._termination():
+        self._drawReward()
+
     return reward
 
   if parse_version(gym.__version__) < parse_version('0.9.6'):

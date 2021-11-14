@@ -52,22 +52,23 @@ class Runner(object):
         if self.is_cuda:
             self.net = self.net.cuda()
 
+        self.episode_num = 0
         # self.writer.add_graph(self.net, input_to_model=(self.storage.states[0],)) --> not working for LSTMCEll
 
         # right = 6, forward = 7, left = 8, reverse = 1
         turn = 5
-        first_section = 40
-        pass_section = 10
+        first_section = 15
+        pass_section = 15
         last_section = 200
         self.action_list = []
         self.action_list = self.action_list + [7, ] * first_section
-        self.action_list = self.action_list + [6, ] * turn
-        self.action_list = self.action_list + [7, ] * pass_section
-        self.action_list = self.action_list + [8, ] * turn
-        self.action_list = self.action_list + [7, ] * pass_section
         self.action_list = self.action_list + [8, ] * turn
         self.action_list = self.action_list + [7, ] * pass_section
         self.action_list = self.action_list + [6, ] * turn
+        self.action_list = self.action_list + [7, ] * 5
+        self.action_list = self.action_list + [6, ] * turn
+        self.action_list = self.action_list + [7, ] * pass_section
+        self.action_list = self.action_list + [8, ] * turn
         self.action_list = self.action_list + [7, ] * last_section
         self.action_num = 0
 
@@ -80,6 +81,7 @@ class Runner(object):
 
         for num_update in range(self.num_updates):  # reset at 2000/(5*5)=80 -> envCounter/(actRepeat*ep_roll_out)
             print("---------------------------roll out: {}---------------------------".format(num_update))
+
             final_value, entropy, mean_reward = self.episode_rollout()
 
             self.net.optimizer.zero_grad()
@@ -104,6 +106,7 @@ class Runner(object):
             if mean_reward > best_reward:
                 best_reward = mean_reward
                 print("model saved with best reward: ", best_reward, " at update #", num_update)
+                self.writer.add_scalar("best_reward", best_reward)
                 torch.save(self.net.state_dict(), "a2c_best_reward")
 
             elif num_update % 10 == 0:
@@ -125,15 +128,16 @@ class Runner(object):
             """Interact with the environments """
             # call A2C
             a_t, log_p_a_t, entropy, value, a2c_features = self.net.a2c.get_action(self.storage.get_state(step))
+
             # accumulate episode entropy
             episode_entropy += entropy
 
             # test
-            a_t = torch.tensor([self.action_list[self.action_num]])
-            self.action_num = self.action_num + 1
+            # a_t = torch.tensor([self.action_list[self.action_num]])
+            # self.action_num = self.action_num + 1
 
             # interact
-            obs, rewards, dones, infos = self.env.step(a_t.numpy())   # .cpu()
+            obs, rewards, dones, infos = self.env.step(a_t.cpu().numpy())   # .cpu()
             episode_reward += rewards
 
             # save episode reward
@@ -143,7 +147,8 @@ class Runner(object):
             self.net.a2c.reset_recurrent_buffers(reset_indices=dones)
 
             if dones[0]:
-                print("---------------------------new episode---------------------------")
+                self.episode_num += 1
+                print("---------------------------episode: {}---------------------------".format(self.episode_num))
 
         episode_reward /= self.rollout_size
         episode_reward = max(episode_reward)        # best of all the environments

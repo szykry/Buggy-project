@@ -158,8 +158,9 @@ class FeatureEncoderNet(nn.Module):
 
     def forward(self, x):
         """
-        states: [4, 5, 4, 128, 128] -> states: [20, 4, 128, 128] -> features: [20, 512] -> features: [4, 5, 512]
-        -> (pos_enc: [4, 5, 512] -> attention: [4, 5, 512]) -> (lstm_input: [4, 512]) -> output: [4, 512]
+        states: [4, 5, 4, 128, 128] (env, frame, rgbd, h ,w) -> states: [20, 4, 128, 128] ->
+        features: [20, 512] -> features: [4, 5, 512] ->
+        (pos_enc: [4, 5, 512] -> attention: [4, 5, 512]) -> (lstm_input: [4, 512]) -> output: [4, 512]
         In: [s_t]
             Current state (i.e. pixels) -> [num_env, n_stack, rgbd, h, w]
 
@@ -245,7 +246,7 @@ class A2CNet(nn.Module):
         value = self.critic(feature)
 
         if self.writer is not None:
-            self.writer.add_histogram("feature", feature.detach())
+            self.writer.add_histogram("feature_encoder", feature.detach())
             self.writer.add_histogram("policy", policy.detach())
             self.writer.add_histogram("value", value.detach())
 
