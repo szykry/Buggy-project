@@ -95,22 +95,6 @@ class RacecarZEDGymEnv(gym.Env):
                                         dtype=np.uint8)
 
     self.viewer = None
-    self._w0Param = 0
-    self._w1Param = 0
-    self._w2Param = 0
-    self._w3Param = 0
-    self._w4Param = 0
-    self._w5Param = 0
-    self._w6Param = 0
-    self._velocityParam = 0
-    self.rewards = []
-    self.alphas = []
-    self.betas = []
-    self.gammas = []
-    self.deltas = []
-    self.epsilons = []
-    self.taus = []
-    self._numStuck = 0
 
   def reset(self):
     print("reset")
@@ -118,16 +102,16 @@ class RacecarZEDGymEnv(gym.Env):
     self._firstAlpha = True
     self._firstDelta = True
     self._firstEps = True
-    self._w0Param = 1
-    self._w1Param = 30
-    self._w2Param = 1
-    self._w3Param = 10
-    self._w4Param = 100
-    self._w5Param = 10
-    self._w6Param = 1
-    self._velocityParam = 5
-	
-	# Lists for plotting the rewards
+    self._w0Param = 1       # total reward
+    self._w1Param = 30      # alpha
+    self._w2Param = 1       # beta
+    self._w3Param = 0       # gamma
+    self._w4Param = 100     # delta
+    self._w5Param = 10      # epsilon
+    self._w6Param = 5       # tau
+    self._velocityParam = 0.5
+
+    # Lists for plotting the rewards
     self.rewards = []
     self.alphas = []
     self.betas = []
@@ -175,7 +159,7 @@ class RacecarZEDGymEnv(gym.Env):
 
     if self.randomMap:
         newX = -10 + 4. * random.random()
-        newY = -15.6
+        newY = -15.6 + 0.4 * random.random()
     else:
         newX = -10
         newY = -15.6
@@ -205,11 +189,11 @@ class RacecarZEDGymEnv(gym.Env):
     self.slider_id0 = self._p.addUserDebugParameter("reward (w0)", 0, 10, 1)
     self.slider_id1 = self._p.addUserDebugParameter("alpha (w1)", 0, 100, 30)
     self.slider_id2 = self._p.addUserDebugParameter("beta (w2)", 0, 10, 1)
-    self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 10)
+    self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 0)
     self.slider_id4 = self._p.addUserDebugParameter("delta (w4)", 0, 100, 100)
     self.slider_id5 = self._p.addUserDebugParameter("epsilon (w5)", 0, 10, 10)
-    self.slider_id6 = self._p.addUserDebugParameter("tau (w6)", 0, 10, 1)
-    self.slider_vel = self._p.addUserDebugParameter("velocity (moving obj)", 0, 10, 5)
+    self.slider_id6 = self._p.addUserDebugParameter("tau (w6)", 0, 10, 5)
+    self.slider_vel = self._p.addUserDebugParameter("velocity (moving obj)", 0, 10, 0.5)
 
   def updateDebug(self):
     """called in step function"""
@@ -449,7 +433,7 @@ class RacecarZEDGymEnv(gym.Env):
           self._numStuck += 1
           if self._numStuck == 10:
               self._envStepCounter = self._terminationNum + 1  # triggering reset
-              alpha = -10
+              alpha = -5 / self._w1Param
               print("Stuck")
       else:
           self._numStuck = 0  # reset stucked roll out counter
@@ -470,7 +454,7 @@ class RacecarZEDGymEnv(gym.Env):
       gauss_opp_lane = N.Normal(torch.tensor([-2 * mu]), torch.tensor([sig]))
 
       if (x >= 1.2) or (x <= -1.2):  # off-road
-          beta = -100  # huge error
+          beta = -10 / self._w2Param  # huge error
       elif x > -mu:
           beta = math.exp(gauss_lane.log_prob(torch.tensor([x])).item())  # = exp(ln(Normal)) -> returns tensor
       else:
@@ -491,7 +475,7 @@ class RacecarZEDGymEnv(gym.Env):
               velocity_vector = math.sqrt(velocity[0][0] ** 2 + velocity[0][1] ** 2)  # sqrt(vx^2 + vy^2)
               gamma = -velocity_vector
           elif (car_light_dist < 0.5):  # agent is too close
-              gamma = -100  # huge error
+              gamma = -10 / self._w3Param # huge error
           else:
               gamma = 0
 
@@ -561,9 +545,9 @@ class RacecarZEDGymEnv(gym.Env):
 
   def _tau(self, car_fin_dist):
       if self._termination():  # car could not reach the finish line before the end of the episode
-          return -100
+          return -5 / self._w6Param
 
-      elif car_fin_dist < 0.3:  # car has reached finish line -> reset
+      elif car_fin_dist < 1.0:  # car has reached finish line -> reset
           tau = self._terminationNum / self._envStepCounter
           self._envStepCounter = self._terminationNum + 1  # TODO: triggering reset
           print("Finish!")
@@ -624,3 +608,4 @@ class RacecarZEDGymEnv(gym.Env):
     _reset = reset
     _seed = seed
     _step = step
+	
