@@ -39,4 +39,4 @@ class ICMAgent(nn.Module):
 
         # optimizer
         self.lr = lr
-        self.optimizer = radam.RAdam(self.a2c.parameters(), self.lr)
+        self.optimizer = radam.RAdam(self.a2c.parameters(), self.lr, weight_decay=1e-3)    # TODO: tune weight decay

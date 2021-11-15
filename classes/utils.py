@@ -29,7 +29,7 @@ def get_args():
     parser.add_argument('--env-name', type=str, default='RacecarZEDGymEnv',
                         help='environment name')
     parser.add_argument('--render', action='store_true', default=True,
-                        help='rendering is on')
+                        help='rendering is on')     # TODO: faster if rendering
     parser.add_argument('--num-envs', type=int, default=1, metavar='NUM_ENVS',
                         help='number of parallel environments')
     parser.add_argument('--n-stack', type=int, default=5, metavar='N_STACK',

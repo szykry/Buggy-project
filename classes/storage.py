@@ -169,7 +169,8 @@ class RolloutStorage(object):
 
         return r_discounted
 
-    def a2c_loss(self, final_value, entropy):
+    def a2c_loss(self, final_value, entropy, num_update):
+        # TODO: PPO
         # calculate advantage
         # i.e. how good was the estimate of the value of the current state
         rewards = self._discount_rewards(final_value)
@@ -190,12 +191,12 @@ class RolloutStorage(object):
         loss = policy_loss + self.value_coeff * value_loss - self.entropy_coeff * entropy
 
         if self.writer is not None:
-            self.writer.add_scalar("a2c_loss", loss.item())
-            self.writer.add_scalar("policy_loss", policy_loss.item())
-            self.writer.add_scalar("value_loss", value_loss.item())
-            self.writer.add_histogram("advantage", advantage.detach())
-            self.writer.add_histogram("discounted_rewards", rewards.detach())
-            self.writer.add_histogram("action_prob", self.log_probs.detach())
+            self.writer.add_scalar("a2c loss", loss.item(), num_update)
+            self.writer.add_scalar("policy loss", policy_loss.item(), num_update)
+            self.writer.add_scalar("value loss", value_loss.item(), num_update)
+            self.writer.add_histogram("advantage", advantage.detach(), num_update)
+            self.writer.add_histogram("discounted rewards", rewards.detach(), num_update)
+            self.writer.add_histogram("action prob", self.log_probs.detach(), num_update)
 
         return loss
 

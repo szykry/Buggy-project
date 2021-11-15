@@ -8,7 +8,7 @@ from torch.distributions import Categorical
 from torch.nn.modules.activation import MultiheadAttention
 
 
-def init(module, weight_init, bias_init, gain=1):
+def init(module, weight_init, bias_init, gain=nn.init.calculate_gain('linear')):
     """
 
     :param module: module to initialize
@@ -54,11 +54,12 @@ class ConvBlock(nn.Module):
         self.stride = 2
         self.pad = self.size // 2
 
-        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
-                               constant_(x, 0), nn.init.calculate_gain('leaky_relu'))
-        # layers
+        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0),
+                               nn.init.calculate_gain('leaky_relu'))    # negative slope: 0.01
+
         # strided convolutions -> downscaling (128, 64, 16, 4, 1)
-        # channels: 8, 32, 128, 512 -> output: [env_num, 512, 1, 1]
+        # channels: 4, 8, 32, 128, 512 -> output: [env_num, 512, 1, 1]
+        # TODO: layer norm
         self.conv1 = init_(nn.Conv2d(ch_in, self.num_filter, self.size, self.stride, self.pad))
         self.conv2 = init_(nn.Conv2d(self.num_filter, self.num_filter*4, self.size, self.stride*2, self.pad))
         self.conv3 = init_(nn.Conv2d(self.num_filter*4, self.num_filter*16, self.size, self.stride*2, self.pad))
@@ -206,8 +207,7 @@ class A2CNet(nn.Module):
         self.num_actions = num_actions
 
         # networks
-        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
-                               constant_(x, 0))
+        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0))
 
         self.feat_enc_net = FeatureEncoderNet(in_channel, self.in_size, is_mha=is_mha, max_len=max_len, is_lstm=is_lstm)
         self.actor = init_(nn.Linear(self.feat_enc_net.h1, self.num_actions))  # estimates what to do
@@ -245,14 +245,9 @@ class A2CNet(nn.Module):
         policy = self.actor(feature)
         value = self.critic(feature)
 
-        if self.writer is not None:
-            self.writer.add_histogram("feature_encoder", feature.detach())
-            self.writer.add_histogram("policy", policy.detach())
-            self.writer.add_histogram("value", value.detach())
+        return policy, value, feature
 
-        return policy, torch.squeeze(value), feature
-
-    def get_action(self, state):
+    def get_action(self, state, action_num):
         """
         Method for selecting the next action
 
@@ -271,7 +266,9 @@ class A2CNet(nn.Module):
         action = cat.sample()
 
         if self.writer is not None:
-            self.writer.add_histogram("action", action.detach())
+            self.writer.add_histogram("feature encoder", feature.detach(), action_num)
+            self.writer.add_histogram("policy", policy.detach(), action_num)
+            self.writer.add_histogram("value", value.detach(), action_num)
+            self.writer.add_histogram("action", action.detach(), action_num)
 
-        return (action, cat.log_prob(action), cat.entropy().mean(), value,
-                feature)
+        return action, cat.log_prob(action), cat.entropy().mean(), torch.squeeze(value), feature
