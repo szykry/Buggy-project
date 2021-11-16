@@ -108,11 +108,11 @@ class Runner(object):
             if mean_reward > best_reward:
                 best_reward = mean_reward
                 print("model saved with best reward: ", best_reward, " at update #", num_update)
-                if self.writer is not None:
+                if self.net.a2c.writer is not None:
                     self.writer.add_scalar("best reward", best_reward, num_update)
                     torch.save(self.net.state_dict(), "a2c_best_reward.pth")
                 else:
-                    torch.save(self.net, "a2c_best_reward.pth")  # TODO: save whole network while tensorboard logging
+                    torch.save(self.net, "a2c_best_reward.pth")  # tensorboard modules cannot be serialized
 
             elif num_update % 10 == 0:
                 print("current loss: ", loss.item(), " at update #", num_update)

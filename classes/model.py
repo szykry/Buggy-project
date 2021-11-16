@@ -190,7 +190,7 @@ class FeatureEncoderNet(nn.Module):
 
 
 class A2CNet(nn.Module):
-    def __init__(self, in_channel, num_actions, in_size=512, is_mha=False, max_len=5000, is_lstm=False, writer=None):
+    def __init__(self, in_channel, num_actions, in_size=512, is_mha=False, max_len=5000, is_lstm=False):
         """
         Implementation of the Advantage Actor-Critic (A2C) network
 
@@ -200,7 +200,7 @@ class A2CNet(nn.Module):
         """
         super().__init__()
 
-        self.writer = writer
+        self.writer = None
 
         # constants
         self.in_size = in_size
