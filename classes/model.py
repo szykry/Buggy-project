@@ -49,6 +49,8 @@ class ConvBlock(nn.Module):
         super().__init__()
 
         # constants
+        self.height = 128
+        self.width = 128
         self.num_filter = 8
         self.size = 3
         self.stride = 2
@@ -59,17 +61,21 @@ class ConvBlock(nn.Module):
 
         # strided convolutions -> downscaling (128, 64, 16, 4, 1)
         # channels: 4, 8, 32, 128, 512 -> output: [env_num, 512, 1, 1]
-        # TODO: layer norm
         self.conv1 = init_(nn.Conv2d(ch_in, self.num_filter, self.size, self.stride, self.pad))
         self.conv2 = init_(nn.Conv2d(self.num_filter, self.num_filter*4, self.size, self.stride*2, self.pad))
         self.conv3 = init_(nn.Conv2d(self.num_filter*4, self.num_filter*16, self.size, self.stride*2, self.pad))
         self.conv4 = init_(nn.Conv2d(self.num_filter*16, self.num_filter*64, self.size, self.stride*2, self.pad))
 
+        self.ln1 = nn.LayerNorm([self.num_filter,      self.height // 2,   self.width // 2], elementwise_affine=False)
+        self.ln2 = nn.LayerNorm([self.num_filter * 4,  self.height // 8,   self.width // 8], elementwise_affine=False)
+        self.ln3 = nn.LayerNorm([self.num_filter * 16, self.height // 32,  self.width // 32], elementwise_affine=False)
+        self.ln4 = nn.LayerNorm([self.num_filter * 64, self.height // 128, self.width // 128], elementwise_affine=False)
+
     def forward(self, x):
-        x = F.leaky_relu(self.conv1(x))
-        x = F.leaky_relu(self.conv2(x))
-        x = F.leaky_relu(self.conv3(x))
-        x = F.leaky_relu(self.conv4(x))
+        x = F.leaky_relu(self.ln1(self.conv1(x)))
+        x = F.leaky_relu(self.ln2(self.conv2(x)))
+        x = F.leaky_relu(self.ln3(self.conv3(x)))
+        x = F.leaky_relu(self.ln4(self.conv4(x)))
 
         return x.view(x.shape[0], -1)  # retain batch size
 
