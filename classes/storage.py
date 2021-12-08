@@ -5,8 +5,8 @@ import torch
 
 
 class RolloutStorage(object):
-    def __init__(self, rollout_size, num_envs, frame_shape, n_stack, feature_size=288, is_cuda=True, value_coeff=0.5,
-                 entropy_coeff=0.02, writer=None):
+    def __init__(self, method, rollout_size, num_envs, frame_shape, n_stack, feature_size=288, is_cuda=True,
+                 use_std_advantage=True, clip_ratio=0.1, value_coeff=0.5, entropy_coeff=0.02, writer=None):
         """
 
         :param rollout_size: number of steps after the policy gets updated
@@ -17,6 +17,7 @@ class RolloutStorage(object):
         """
         super().__init__()
 
+        self.method = method
         self.rollout_size = rollout_size
         self.num_envs = num_envs
         self.n_stack = n_stack
@@ -25,6 +26,8 @@ class RolloutStorage(object):
         self.is_cuda = is_cuda
         self.episode_rewards = deque(maxlen=10)
 
+        self.use_std_advantage = use_std_advantage
+        self.clip_ratio = clip_ratio
         self.value_coeff = value_coeff
         self.entropy_coeff = entropy_coeff
         self.writer = writer
@@ -169,16 +172,27 @@ class RolloutStorage(object):
 
         return r_discounted
 
-    def a2c_loss(self, final_value, entropy, num_update):
-        # TODO: PPO
+    def actor_critic_loss(self, final_log_probs, final_value, entropy, num_update):
         # calculate advantage
         # i.e. how good was the estimate of the value of the current state
         rewards = self._discount_rewards(final_value)
         advantage = rewards - self.values
+        if self.use_std_advantage:
+            advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-10)
 
-        # weight the deviation of the predicted value (of the state) from the
-        # actual reward (=advantage) with the negative log probability of the action taken
-        policy_loss = (-self.log_probs * advantage.detach()).mean()
+        if self.method.lower() == "a2c":
+            # weight the deviation of the predicted value (of the state) from the
+            # actual reward (=advantage) with the negative log probability of the action taken
+            policy_loss = (-self.log_probs * advantage.detach()).mean()
+
+        elif self.method.lower() == "ppo":
+            ratio = torch.exp(final_log_probs - self.log_probs)
+            clipped_ratio = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
+            surrogate = torch.min(ratio * advantage, clipped_ratio * advantage)
+            policy_loss = -surrogate.mean()
+
+        else:
+            raise NotImplementedError
 
         # the value loss weights the squared difference between the actual
         # and predicted rewards
@@ -191,7 +205,7 @@ class RolloutStorage(object):
         loss = policy_loss + self.value_coeff * value_loss - self.entropy_coeff * entropy
 
         if self.writer is not None:
-            self.writer.add_scalar("a2c loss", loss.item(), num_update)
+            self.writer.add_scalar(f"{self.method} loss", loss.item(), num_update)
             self.writer.add_scalar("policy loss", policy_loss.item(), num_update)
             self.writer.add_scalar("value loss", value_loss.item(), num_update)
             self.writer.add_histogram("advantage", advantage.detach(), num_update)

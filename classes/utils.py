@@ -9,13 +9,15 @@ def get_args():
 
     :return: parsed   command line arguments
     """
-    parser = argparse.ArgumentParser(description='PyTorch A2C')
+    parser = argparse.ArgumentParser(description='PyTorch Actor-Critic')
 
     # training
     parser.add_argument('--cuda', action='store_true', default=True,
                         help='CUDA flag')
     parser.add_argument('--tensorboard', action='store_true', default=True,
                         help='log with Tensorboard')
+    parser.add_argument('--method', type=str, default='ppo',
+                        help='type of the method: A2C or PPO')
     parser.add_argument('--log-dir', type=str, default="../buggy/logs/a2c",
                         help='log directory for Tensorboard')
     parser.add_argument('--seed', type=int, default=42, metavar='SEED',
@@ -24,6 +26,8 @@ def get_args():
                         help='threshold for gradient clipping')
     parser.add_argument('--lr', type=float, default=1e-4, metavar='LR',
                         help='learning rate')
+    parser.add_argument('--std-advantage', action='store_true', default=True,
+                        help='Flag for using standardized advantage for better stability')
 
     # environment
     parser.add_argument('--env-name', type=str, default='RacecarZEDGymEnv',
@@ -48,6 +52,8 @@ def get_args():
                         help='curiosity-based exploration coefficient')
     parser.add_argument('--icm-beta', type=float, default=.2, metavar='ICM_BETA',
                         help='beta for the ICM module')
+    parser.add_argument('--clip-ratio', type=float, default=.1, metavar='CLIP_RATIO',
+                        help='clipping ratio for PPO policy loss')
     parser.add_argument('--value-coeff', type=float, default=.5, metavar='VALUE_COEFF',
                         help='value loss weight factor in the A2C loss')
     parser.add_argument('--entropy-coeff', type=float, default=.02, metavar='ENTROPY_COEFF',

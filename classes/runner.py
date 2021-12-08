@@ -10,8 +10,9 @@ from classes.storage import RolloutStorage
 
 class Runner(object):
 
-    def __init__(self, net, env, num_envs, n_stack, rollout_size=5, num_updates=2500000, max_grad_norm=0.5,
-                 value_coeff=0.5, entropy_coeff=0.02, tensorboard_log=False, log_path="./log", is_cuda=True, seed=42):
+    def __init__(self, net, env, method, num_envs, n_stack, rollout_size=5, num_updates=2500000, max_grad_norm=0.5,
+                 clip_ratio=0.1, value_coeff=0.5, entropy_coeff=0.02, tensorboard_log=False, log_path="./log",
+                 is_cuda=True, use_std_advantage=True, seed=42):
         super().__init__()
 
         # constants
@@ -35,11 +36,14 @@ class Runner(object):
 
         frame_shape = self.env.observation_space.shape
         permuted_frame_shape = (frame_shape[2], frame_shape[0], frame_shape[1])
-        self.storage = RolloutStorage(rollout_size=self.rollout_size,
+        self.storage = RolloutStorage(method=method,
+                                      rollout_size=self.rollout_size,
                                       num_envs=self.num_envs,
                                       frame_shape=permuted_frame_shape,
                                       n_stack=self.n_stack,
                                       is_cuda=self.is_cuda,
+                                      use_std_advantage=use_std_advantage,
+                                      clip_ratio=clip_ratio,
                                       value_coeff=value_coeff,
                                       entropy_coeff=entropy_coeff,
                                       writer=self.writer)
@@ -82,13 +86,13 @@ class Runner(object):
         for num_update in range(self.num_updates):  # reset at 2000/(5*5)=80 -> envCounter/(actRepeat*ep_roll_out)
             print("---------------------------roll out: {}---------------------------".format(num_update))
 
-            final_value, entropy, mean_reward = self.episode_rollout()
+            final_value, final_log_probs, entropy, mean_reward = self.episode_rollout()
             print("mean: ", mean_reward)
 
             self.net.optimizer.zero_grad()
 
             """Assemble loss"""
-            loss = self.storage.a2c_loss(final_value, entropy, num_update)
+            loss = self.storage.actor_critic_loss(final_log_probs, final_value, entropy, num_update)
             loss.backward(retain_graph=False)
 
             # gradient clipping
@@ -132,8 +136,7 @@ class Runner(object):
         for step in range(self.rollout_size):
             """Interact with the environments """
             # call A2C
-            a_t, log_p_a_t, entropy, value, a2c_features = self.net.a2c.get_action(self.storage.get_state(step),
-                                                                                   self.action_num)
+            a_t, log_p_a_t, entropy, value = self.net.a2c.get_action(self.storage.get_state(step), self.action_num)
             self.action_num += 1
 
             # accumulate episode entropy
@@ -165,8 +168,8 @@ class Runner(object):
         # that's why we have the CRITIC --> estimate final reward
         # detach, as the final value will only be used as a
         with torch.no_grad():
-            _, _, _, final_value, final_features = self.net.a2c.get_action(self.storage.get_state(step + 1),
-                                                                           self.action_num)
+            _, final_log_probs, _, final_value = self.net.a2c.get_action(self.storage.get_state(step + 1),
+                                                                                self.action_num)
             self.action_num += 1
 
-        return final_value, episode_entropy, rollout_reward
+        return final_value, final_log_probs, episode_entropy, rollout_reward

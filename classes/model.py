@@ -262,19 +262,21 @@ class A2CNet(nn.Module):
         """
 
         """Evaluate the A2C"""
-        policy, value, feature = self(state)  # use A3C to get policy and value
+        policy_logits, value, feature = self(state)  # use A3C to get policy and value
 
         """Calculate action"""
         # 1. convert policy outputs into probabilities
         # 2. sample the categorical  distribution represented by these probabilities
-        action_prob = F.softmax(policy, dim=-1)
+        action_prob = F.softmax(policy_logits, dim=-1)
         cat = Categorical(action_prob)
         action = cat.sample()
+        log_prob = cat.log_prob(action)
+        entropy = cat.entropy().mean()
 
         if self.writer is not None:
             self.writer.add_histogram("feature encoder", feature.detach(), action_num)
-            self.writer.add_histogram("policy", policy.detach(), action_num)
+            self.writer.add_histogram("policy", policy_logits.detach(), action_num)
             self.writer.add_histogram("value", value.detach(), action_num)
             self.writer.add_histogram("action", action.detach(), action_num)
 
-        return action, cat.log_prob(action), cat.entropy().mean(), torch.squeeze(value), feature
+        return action, log_prob, entropy, torch.squeeze(value)
