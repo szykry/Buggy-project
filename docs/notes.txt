@@ -1,0 +1,43 @@
+docs:
+-cobra effect - megoldás több problémát szül
+-mutatis mutandis
+-mea culpa - én hibám
+-per se - önmagában
+-soft computing
+-one-hot
+-inference
+-logits: utolsó nyers kimenet, osztályozó fgv előtt (pl softmax)
+-NCHW formátum (nxcxhxw)
+
+-irodalom:
+	-MDP (model-free vs given)
+	-off-policy vs on-policy
+	-stohastic (policy gradient sampling -> nem ua. output ua. az inputra) -> Q-learning az deterministic
+	-REINFORCE tulajdonképpen NLL loss, osztályozás, jó/rossz lépés
+	-TDL:
+    		- trial-and-error
+    		- model-free: nem ismertek az átviteli függvények és a jutalmak
+    		- bootstrapping: nem a teljes epizódból tanul
+	-attention: O(n^2*d)
+
+todo:
+-render bug, a példát futtatva is bugos -> sdf (jól van szétbontva) vagy openGL driver?
+-uj conda envbe az egész projektet
+-colabban render video
+-kép a gradiens felületről
+-csoportosításhoz témák keresése
+-Nebula25
+-putty
+
+
+-0.6 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   0 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 0.6 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+-0.6 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   0 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 0.6 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+-0.6 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   0 +++++
+ 0.6 ++
