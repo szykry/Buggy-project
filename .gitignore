@@ -2,9 +2,6 @@
 /.idea/workspace.xml
 /.idea/libraries/lib.xml
 /classes/__pycache__/
-/docs/dipterv1/
-/docs/dipterv2/
-/docs/onlab1/
-/docs/onlab2/
-/docs/notes.txt
-/logs
+/docs/
+/checkpoints/
+/logs/
