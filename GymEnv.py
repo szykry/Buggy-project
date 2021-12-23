@@ -102,7 +102,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._firstAlpha = True
     self._firstDelta = True
     self._firstEps = True
-    self._w0Param = 1       # total reward
+    self._w0Param = 0.7       # total reward
     self._w1Param = 30      # alpha
     self._w2Param = 1       # beta
     self._w3Param = 0       # gamma
@@ -175,7 +175,7 @@ class RacecarZEDGymEnv(gym.Env):
     self._observation = self.getExtendedObservation()
     obs = np.array(self._observation)
 
-    return [obs, obs, obs, obs, obs]
+    return [obs, ] * self._actionRepeat
 
   def __del__(self):
     self._p = 0
@@ -186,7 +186,7 @@ class RacecarZEDGymEnv(gym.Env):
     self.button_id1 = self._p.addUserDebugParameter("follow car", 0, 1, 0)
 
     # add slider
-    self.slider_id0 = self._p.addUserDebugParameter("reward (w0)", 0, 10, 1)
+    self.slider_id0 = self._p.addUserDebugParameter("reward (w0)", 0, 10, 0.7)
     self.slider_id1 = self._p.addUserDebugParameter("alpha (w1)", 0, 100, 30)
     self.slider_id2 = self._p.addUserDebugParameter("beta (w2)", 0, 10, 1)
     self.slider_id3 = self._p.addUserDebugParameter("gamma (w3)", 0, 10, 0)
@@ -489,13 +489,13 @@ class RacecarZEDGymEnv(gym.Env):
       # calculating distances between the car and objects
       for i, k in enumerate(self._stationaryObjects.keys()):
           sObj_pos.append(self._stationaryObjects[k]["pose_xyz"])
-          car_sObj_dist = self._distance3D(car_pos, sObj_pos[i])
+          car_sObj_dist = self._distance2D(car_pos, sObj_pos[i])
 
           if car_sObj_dist < nearest:
               nearest = car_sObj_dist
               angle = self._angle2D(car_pos, sObj_pos[i])
 
-      inRange = nearest < 1
+      inRange = nearest < 1.5
 
       # computing if the nearest object is in the field of view (30°)
       inView = abs(yaw - angle) <= math.pi / 6
@@ -509,7 +509,7 @@ class RacecarZEDGymEnv(gym.Env):
       self._prevDistanceFromNearest = car_sObj_dist
 
       # computing delta
-      if inRange and inView and gettingCloser:
+      if inRange and inView:
           delta = -math.exp(-7 * (nearest ** 2))
       else:
           delta = 0
@@ -521,7 +521,7 @@ class RacecarZEDGymEnv(gym.Env):
                                                self._movingObjectUniqueId,
                                                10000)  # this is the max allowed distance
       car_mObj_dist = closestPoints[0][8]   # base-to-base
-      inRange = car_mObj_dist < 1
+      inRange = car_mObj_dist < 1.5
 
       # computing if the moving object is in the field of view (30°)
       angle = self._angle2D(closestPoints[0][5], closestPoints[0][6])
@@ -583,7 +583,7 @@ class RacecarZEDGymEnv(gym.Env):
     # compute rewards
     alpha = self._alpha(car_fin_dist)
     beta = self._beta(car_pos)
-    gamma = self._gamma(car_pos)
+    gamma = 0 # self._gamma(car_pos)
     delta = self._delta(car_pos, yaw)
     epsilon = self._epsilon(yaw)
     tau = self._tau(car_fin_dist)
