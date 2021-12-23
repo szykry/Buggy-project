@@ -5,7 +5,7 @@ import random
 from pybullet_envs.bullet.racecarZEDGymEnv import RacecarZEDGymEnv
 from stable_baselines.common.vec_env import SubprocVecEnv
 
-from classes.agent import ICMAgent
+from classes.agent import Agent
 from classes.runner import Runner
 from classes.utils import get_args
 
@@ -21,13 +21,13 @@ def main():
     env = SubprocVecEnv([make_env(render=args.render, rank=i, action_repeat=args.n_stack) for i in range(args.num_envs)])
 
     """Agent"""
-    agent = ICMAgent(in_channel=4, num_envs=args.num_envs, num_actions=env.action_space.n, lr=args.lr,
-                     action_repeat=args.n_stack, is_mha=args.attention, is_lstm=args.lstm)
+    agent = Agent(in_channel=4, num_envs=args.num_envs, num_actions=env.action_space.n, lr=args.lr,
+                  action_repeat=args.n_stack, is_mha=args.attention, is_lstm=args.lstm)
 
     """Train"""
     runner = Runner(agent, env, args.method, args.num_envs, args.n_stack, args.rollout_size, args.num_updates,
                     args.max_grad_norm, args.clip_ratio, args.value_coeff, args.entropy_coeff,
-                    args.tensorboard, args.log_dir, args.std_advantage, args.cuda, args.seed)
+                    args.tensorboard, args.log_dir, args.cuda, args.std_advantage, args.seed)
     runner.train()
 
 

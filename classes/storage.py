@@ -109,7 +109,7 @@ class RolloutStorage(object):
         """
         tensor = torch.tensor(obs)
         tensor = tensor.permute(0, 1, 4, 2, 3)
-        t = tensor / 255.   # -> need normalization?
+        t = tensor / 255.   # -> depth also need normalization
         return t.cuda() if self.is_cuda else t
 
     def insert(self, step, reward, obs, action, log_prob, value, dones):

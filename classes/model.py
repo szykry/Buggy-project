@@ -66,10 +66,10 @@ class ConvBlock(nn.Module):
         self.conv3 = init_(nn.Conv2d(self.num_filter*4, self.num_filter*16, self.size, self.stride*2, self.pad))
         self.conv4 = init_(nn.Conv2d(self.num_filter*16, self.num_filter*64, self.size, self.stride*2, self.pad))
 
-        self.ln1 = nn.LayerNorm([self.num_filter,      self.height // 2,   self.width // 2], elementwise_affine=False)
-        self.ln2 = nn.LayerNorm([self.num_filter * 4,  self.height // 8,   self.width // 8], elementwise_affine=False)
-        self.ln3 = nn.LayerNorm([self.num_filter * 16, self.height // 32,  self.width // 32], elementwise_affine=False)
-        self.ln4 = nn.LayerNorm([self.num_filter * 64, self.height // 128, self.width // 128], elementwise_affine=False)
+        self.ln1 = nn.LayerNorm([self.num_filter,      self.height // 2,   self.width // 2], elementwise_affine=True)
+        self.ln2 = nn.LayerNorm([self.num_filter * 4,  self.height // 8,   self.width // 8], elementwise_affine=True)
+        self.ln3 = nn.LayerNorm([self.num_filter * 16, self.height // 32,  self.width // 32], elementwise_affine=True)
+        self.ln4 = nn.LayerNorm([self.num_filter * 64, self.height // 128, self.width // 128], elementwise_affine=True)
 
     def forward(self, x):
         x = F.leaky_relu(self.ln1(self.conv1(x)))

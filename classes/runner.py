@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 from classes.storage import RolloutStorage
+from classes.utils import get_args, save_checkpoint, load_checkpoint
 
 
 class Runner(object):
@@ -14,6 +15,8 @@ class Runner(object):
                  clip_ratio=0.1, value_coeff=0.5, entropy_coeff=0.02, tensorboard_log=False, log_path="./log",
                  is_cuda=True, use_std_advantage=True, seed=42):
         super().__init__()
+
+        self.args = get_args()
 
         # constants
         self.num_envs = num_envs
@@ -29,7 +32,8 @@ class Runner(object):
 
         # objects
         """Tensorboard logger"""
-        self.writer = SummaryWriter(comment="statistics", log_dir=log_path) if tensorboard_log else None
+        log_dir = log_path + "/" + method
+        self.writer = SummaryWriter(comment="statistics", log_dir=log_dir) if tensorboard_log else None
 
         """Environment"""
         self.env = env
@@ -51,6 +55,14 @@ class Runner(object):
         """Network"""
         self.net = net
         self.net.a2c.writer = self.writer
+
+        self.checkpoint_num = 0
+        self.best_reward = -np.inf
+        if self.args.checkpoint:
+            self.net, self.net.optimizer, self.checkpoint_num, self.best_reward = load_checkpoint(self.net,
+                                                                                                  self.net.optimizer,
+                                                                                                  self.args.save_dir,
+                                                                                                  self.args.load_name)
 
         if self.is_cuda:
             self.net = self.net.cuda()
@@ -81,9 +93,9 @@ class Runner(object):
         """Environment reset"""
         obs = self.env.reset()  # this is a second reset!
         self.storage.states[0].copy_(self.storage.obs2tensor(obs))
-        best_reward = -np.inf
 
-        for num_update in range(self.num_updates):  # reset at 2000/(5*5)=80 -> envCounter/(actRepeat*ep_roll_out)
+        # reset at 2000/(5*5)=80 -> envCounter/(actRepeat*ep_roll_out)
+        for num_update in range(self.checkpoint_num, self.num_updates):
             print("---------------------------roll out: {}---------------------------".format(num_update))
 
             final_value, final_log_probs, entropy, mean_reward = self.episode_rollout()
@@ -100,21 +112,24 @@ class Runner(object):
 
             self.net.optimizer.step()
 
-            # it stores a lot of data which let's the graph
-            # grow out of memory, so it is crucial to reset
+            # it stores a lot of data which let's the graph grow out of memory, so it is crucial to reset
             self.storage.after_update()
 
             """Logging"""
             if self.writer is not None:
                 self.writer.add_scalar("rollout rewards", mean_reward.item(), num_update)
-                self.writer.add_scalar("loss", loss.item(), num_update)
 
-            if mean_reward > best_reward:
-                best_reward = mean_reward
-                print("model saved with best reward: ", best_reward, " at update #", num_update)
+            if mean_reward > self.best_reward:
+                self.best_reward = mean_reward
+                print("model saved with best reward: ", self.best_reward, " at update #", num_update)
                 if self.net.a2c.writer is not None:
-                    self.writer.add_scalar("best reward", best_reward, num_update)
-                    torch.save(self.net.state_dict(), "a2c_best_reward.pth")
+                    self.writer.add_scalar("best reward", self.best_reward, num_update)
+
+                    self.net.to(torch.device("cpu"))  # Put this model to CPU in any case before saving
+                    save_checkpoint(self.net,  self.net.optimizer, num_update, self.best_reward, self.args)
+
+                    # Put this model back to GPU if possible
+                    self.net.to(torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))
                 else:
                     torch.save(self.net, "a2c_best_reward.pth")  # tensorboard modules cannot be serialized
 
